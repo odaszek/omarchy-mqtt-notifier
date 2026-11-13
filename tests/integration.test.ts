@@ -1,7 +1,7 @@
 // End-to-end: real helper process (started through helper/start.sh, with
 // production permissions) against in-process aedes MQTT brokers.
 
-import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1"
+import { assert, assertEquals, assertFalse, assertStringIncludes } from "jsr:@std/assert@1"
 import aedes from "npm:aedes@0.51.3"
 import net from "node:net"
 import { Buffer } from "node:buffer"
@@ -297,7 +297,7 @@ Deno.test({
             {
               id: "xml",
               topic: "xml/#",
-              parserScript: "var d = parseXml(msgin); msgout = d.sensor.status",
+              parserScript: "var d = parseXml(msgin); if (d.sensor.status === 'ignore') return false; msgout = d.sensor.status",
             },
           ],
         },
@@ -363,6 +363,8 @@ Deno.test({
         "plain numbers, JSON, XML, invalid UTF-8, parser errors (AC05–AC09, AC16)",
         async () => {
           const before = helper.notifications().length
+          // Dropped by the parser (`return false`): no notification at all.
+          await a.publish("xml/sensor", "<sensor><status>ignore</status></sensor>")
           await a.publish("home/kitchen/temp", "21.5")
           await a.publish(
             "sensors/attic/climate",
@@ -385,6 +387,7 @@ Deno.test({
           assertEquals(byTopic("xml/sensor").text, "warning")
           assertEquals(byTopic("home/raw").text, "OK�!")
           assertEquals(byTopic("x/1").broker, "Beta")
+          assertFalse(ns.some((n) => n.text === "ignore"))
 
           const before2 = helper.notifications().length
           await a.publish("sensors/broken/climate", "not json")
@@ -522,6 +525,8 @@ Deno.test({
           assertEquals(out.text, "HI")
           assertEquals(out.link, null)
           assertEquals(out.warnings.length, 1)
+          const ignored = await helper.request("testParser", { script: "return false", input: "hi" })
+          assertEquals(ignored.dropped, true)
           const conn = await helper.request("testConnection", {
             brokerId: "a",
           })

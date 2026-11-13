@@ -118,7 +118,7 @@ Panel {
       ? strings.tn("tooltip.brokersDown", root.warnings.length).arg(Commons.I18n.formatNumber(root.warnings.length))
       : strings.tn("tooltip.unread", root.unread).arg(Commons.I18n.formatNumber(root.unread)))
     onPressed: function(b) {
-      if (b === Qt.LeftButton) root.toggle()
+      if (b === Qt.LeftButton || b === Qt.RightButton) root.toggle()
       else if (b === Qt.MiddleButton && root.service) root.service.reconnect()
     }
   }

@@ -6,6 +6,12 @@ import ".."
 
 // History size, retention, clear, export and import.
 SettingsPage {
+  // Esc: cancel the clear confirmation if it is showing.
+  function cancelDialog() {
+    if (!confirmClear) return false
+    confirmClear = false
+    return true
+  }
   id: page
 
   readonly property var s: app.strings

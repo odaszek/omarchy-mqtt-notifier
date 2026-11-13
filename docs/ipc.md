@@ -8,7 +8,7 @@
 
 | op | params | result |
 |---|---|---|
-| `settings` | `settings: {maxStoredMessages?, desktopNotifications?}` | `{retention, desktopNotifications}`. A smaller retention is applied immediately. |
+| `settings` | `settings: {maxStoredMessages?, desktopNotifications?, linkLabel?}` (`linkLabel`: the desktop notification's link text, `%1` = host) | `{retention, desktopNotifications}`. A smaller retention is applied immediately. |
 | `page` | `limit`, `beforeSeq?` | `{items, hasMore, total, unread}`, newest first. `beforeSeq` is the `seq` of the last item already shown. |
 | `markAllRead` | – | `{readThroughSeq}` |
 | `clear` | – | `{total: 0}` |
@@ -16,7 +16,7 @@
 | `stats` | – | `{version, total, unread, retention, sandbox, configPath, statePath, problems, configError}` |
 | `reload` | – | Re-read `config.json` now. |
 | `reconnect` | – | Reconnect every enabled broker that isn't connected. |
-| `testParser` | `script`, `input` | `{text, icon, link, fallback, error, warnings, logs}`. Nothing is stored. |
+| `testParser` | `script`, `input` | `{text, icon, link, fallback, dropped, error, warnings, logs}`. `dropped` is true when the script returned `false`. Nothing is stored. |
 | `testConnection` | `brokerId`, or `broker` (an unsaved draft) + optional `password` | `{ok, error, ms}`, using a separate client id. A draft password is used for this test only. |
 | `getConfig` | – | `{path, error, problems, brokers, secrets: {<id>: {password, keyPassphrase}}, secretStore, parserFiles: {<file>: text}, certs: [names]}`. Secrets are reported as present/absent only. |
 | `saveConfig` | `brokers`, `parserFiles?` | `{saved, errors: [{path, message}], problems}`. Validates, writes `config.json` atomically (keeping other top-level keys), writes `parsers/<file>`, clears keyring secrets of removed brokers, reloads. |
@@ -35,8 +35,9 @@
 | `brokers` | `brokers: [{id, name, enabled, state, error, retryIn, subscriptions}]`. `state` is `disabled`, `connecting`, `connected`, `disconnected` or `error`. Bursts are coalesced (50 ms). |
 | `notification` | `notification: {seq, id, timestamp, brokerId, broker, subscriptionId, topic, text, icon, link, read}` |
 | `counts` | `total, unread` |
-| `activate` | `id`: a desktop notification was clicked |
-| `log` | `level` (`warn`/`error`), `message` |
+| `activate` | `id`: a desktop notification without a link was clicked (open the panel) |
+| `openLink` | `id, url`: a desktop notification with a link was clicked. The panel re-checks the URL before opening it. |
+| `log` | `level` (`warn`/`error`), `message`. Broker connection messages are not sent here; the `brokers` event carries that state. |
 | `fatal` | `error`: the helper is about to exit (deno missing, another instance holds the lock) |
 
 ## Storage format

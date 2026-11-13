@@ -8,14 +8,27 @@ A parser turns one MQTT payload into one notification. Each subscription has its
 |---|---|---|
 | `msgin` | input, string | The payload decoded as UTF-8. Invalid bytes become U+FFFD (�). |
 | `msgout` | output, starts as `""` | Notification text. Must end up a non-empty string. |
-| `msgicon` | output, starts as `null` | `ICON_QUESTION`, `ICON_WARN`, `ICON_ERROR`, `ICON_OK` or `null`. |
+| `msgicon` | output, starts as `null` | `ICON_NOTIFY`, `ICON_QUESTION`, `ICON_WARN`, `ICON_ERROR`, `ICON_OK` or `null`. |
 | `msglink` | output, starts as `null` | An absolute `http://` or `https://` URL, or `null`. |
 | `to_string(v)` | function | Strings unchanged, numbers as decimals, booleans as `true`/`false`, objects and arrays as JSON, `null`/`undefined` as `""`. |
 | `parseXml(text)` | function | XML to a plain object (see below). |
 | `JSON`, `Math`, `Date`, `RegExp`, `Intl`, … | built-ins | Standard JavaScript, frozen. |
 | `console.log/info/warn/error` | function | Captured (up to 20 lines) and shown by the parser test, not in the shell log. |
 
+In the settings window, **Format** rewrites a script with one statement per line (after `;`, around `{ }` blocks) and two-space indentation; strings, comments, template literals and `for (;;)` headers are left intact. It only changes layout, never what the script does.
+
 Scripts run in strict mode, so assigning to an undeclared variable is an error; use `var`/`let`/`const`. `return` ends the script early, and whatever the outputs hold at that point is used.
+
+**Filtering:** `return false` ignores the message: no notification, nothing stored, no desktop popup. Any other ending (`return true`, a bare `return`, no `return` at all, or any other value) keeps it. Only the exact boolean `false` drops a message.
+
+| Icon | Panel glyph | Desktop urgency |
+|---|---|---|
+| `ICON_NOTIFY` | bell | normal |
+| `ICON_QUESTION` | question mark | normal |
+| `ICON_WARN` | warning triangle | normal |
+| `ICON_ERROR` | cross (red-tinted) | critical |
+| `ICON_OK` | check mark | low |
+| `null` | message | normal |
 
 There is no file, network, environment, timer or subprocess access, and the `Deno` and Node globals have been removed. A script has 250 ms and a 64 MB heap; both limits can be changed under `advanced`.
 
@@ -23,14 +36,15 @@ There is no file, network, environment, timer or subprocess access, and the `Den
 
 | What happens | Notification |
 |---|---|
+| Script returns `false` | **None.** The message is ignored (the parser test says so) |
 | Script runs; `msgout` is a non-empty string | `msgout` (trimmed, max 4096 characters), `msgicon`, `msglink` |
-| `msgicon` isn't one of the four constants | Same, without an icon; a warning goes to the log |
+| `msgicon` isn't one of the icon constants | Same, without an icon; a warning goes to the log |
 | `msglink` isn't an http(s) URL (or contains credentials) | Same, without a link; a warning goes to the log |
 | `msgout` is empty or not a string | **Fallback:** the raw payload, `ICON_ERROR`, no link; the reason goes to the log |
 | The script throws, times out, or runs out of memory | **Fallback** as above; the worker is restarted when needed |
 | Payload larger than `maxPayloadBytes` (256 KiB) | "Payload too large (N bytes …)", `ICON_ERROR` |
 
-A message is never dropped because its parser failed.
+A message is never dropped because its parser failed: only an explicit `return false` drops one.
 
 ## Examples
 

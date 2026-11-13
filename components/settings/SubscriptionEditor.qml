@@ -26,6 +26,14 @@ Column {
 
   signal finished()
 
+  // Unsaved changes: any field or the script differs from when the editor opened.
+  readonly property string snapshot: JSON.stringify([fTopic, fQos, fDescription, fEnabled, fIgnoreRetained, editor.script])
+  property string initialSnapshot: ""
+  readonly property bool dirty: initialSnapshot !== "" && snapshot !== initialSnapshot
+  Component.onCompleted: initialSnapshot = snapshot
+  onDirtyChanged: app.dirty = dirty
+  Component.onDestruction: app.dirty = false
+
   spacing: Style.space(12)
 
   function fieldError(name) {

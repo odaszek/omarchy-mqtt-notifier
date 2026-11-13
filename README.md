@@ -6,7 +6,7 @@ A bar widget for the Omarchy 4.5 shell that turns MQTT messages into notificatio
 - Optional JavaScript parser per subscription that turns the payload into text, an icon and a link. Parsers run in a sandbox.
 - Bar icon with an unread count, and a red-tinted (theme `urgent`) warning when a broker is unreachable.
 - Panel with notification history, paging ("More"), clickable links and Clear All.
-- Desktop notifications through Omarchy's notification daemon. Clicking one opens the panel.
+- Desktop notifications through Omarchy's notification daemon. A link shows as an "Open <host>" line under the text, as in the panel. Clicking a notification opens its link, or the panel when it has none.
 - History is kept in a JSON Lines file and survives shell restarts.
 
 ## Install
@@ -28,11 +28,11 @@ Uninstall with `scripts/uninstall.sh`. Add `--purge` to also delete config, hist
 
 ## Settings window
 
-The gear button in the panel opens a floating settings window:
+The gear button in the panel opens a floating settings window. Esc closes it from anywhere (cancelling an open confirmation first; unsaved editor changes are discarded). A mouse click outside the window closes it too (just moving the pointer away doesn't), unless an editor has unsaved changes:
 
 - **General:** panel size, page sizes, desktop notifications, unread counter, mark-read-on-open (written to `shell.json`).
 - **Brokers:** add, edit, delete and enable brokers, with live connection status (green connected, yellow connecting, red unreachable, grey disabled) and **Test connection** for unsaved changes. Passwords go straight to the keyring.
-- **Subscriptions:** grouped by broker, each with a parser editor (Tab indents, Ctrl+Tab leaves the editor) and a **Test parser** bench that runs your script in the same sandbox as live messages without storing anything.
+- **Subscriptions:** grouped by broker, each with a parser editor (Tab indents, Ctrl+Tab leaves the editor, long lines wrap, **Format** puts one statement per line and re-indents) and a **Test parser** bench that runs your script in the same sandbox as live messages without storing anything.
 - **Storage:** history size, clear, export to JSON, import an export.
 - **About:** version, helper and sandbox status, file locations.
 
@@ -115,7 +115,7 @@ If no keyring is available, set `"advanced": { "secretStore": "file" }`. Secrets
 
 ## Parsers
 
-See [docs/parser.md](docs/parser.md). In short, the script reads `msgin` (the payload as UTF-8 text) and sets `msgout` (text), `msgicon` (`ICON_QUESTION`, `ICON_WARN`, `ICON_ERROR`, `ICON_OK` or `null`) and `msglink` (an http(s) URL or `null`). `parseXml(text)` and `to_string(value)` are available.
+See [docs/parser.md](docs/parser.md). In short, the script reads `msgin` (the payload as UTF-8 text) and sets `msgout` (text), `msgicon` (`ICON_NOTIFY`, `ICON_QUESTION`, `ICON_WARN`, `ICON_ERROR`, `ICON_OK` or `null`) and `msglink` (an http(s) URL or `null`). `return false` ignores the message; any other ending keeps it. `parseXml(text)` and `to_string(value)` are available.
 
 ## Widget settings
 
@@ -135,9 +135,10 @@ Example: `omarchy bar set odach.mqtt-notifier maxStoredMessages 5000 --json`
 
 ## Using it
 
-- **Left-click** the bell to open or close the panel. **Middle-click** reconnects all brokers now.
+- **Left- or right-click** the bell to open or close the panel. **Middle-click** reconnects all brokers now.
 - **Keyboard:** ↑/↓ (or k/j) select a row; going past the last row loads more. Enter or Space opens the selected link. `x` or Delete starts Clear All. Esc closes. Tab moves to the neighbouring panel.
-- **From scripts:** `omarchy-shell shell summon odach.mqtt-notifier` opens the settings window (see above). Clicking a desktop notification opens the bell panel on the focused screen.
+- **From scripts:** `omarchy-shell shell summon odach.mqtt-notifier` opens the settings window (see above). Clicking a desktop notification without a link opens the bell panel on the focused screen.
+- The panel's warning block lists enabled brokers that are currently unreachable; it clears as soon as they reconnect. Disabled brokers are never reported. Other helper warnings (a failing parser, for example) show in the footer for 10 minutes.
 - Opening the panel marks everything already received as read. Messages that arrive while it's open stay unread.
 
 ## Files

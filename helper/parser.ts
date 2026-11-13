@@ -10,6 +10,8 @@ import type { Logger } from "./log.ts"
 
 export interface ParserResult {
   ok: boolean
+  /** False when the script returned exactly `false`: the message is dropped. */
+  keep?: boolean
   msgout?: unknown
   msgicon?: unknown
   msglink?: unknown
@@ -340,7 +342,7 @@ function parseReply(line: string, id: number): ParserResult {
     ? msg.logs.filter((l: unknown) => typeof l === "string").slice(0, 20).map((l: string) => l.slice(0, 600))
     : []
   if (!msg.ok) return { ok: false, error: typeof msg.error === "string" ? msg.error.slice(0, 1000) : "parser failed", logs }
-  return { ok: true, msgout: msg.msgout, msgicon: msg.msgicon, msglink: msg.msglink, logs }
+  return { ok: true, keep: msg.keep !== false, msgout: msg.msgout, msgicon: msg.msgicon, msglink: msg.msglink, logs }
 }
 
 // deno-lint-ignore no-explicit-any

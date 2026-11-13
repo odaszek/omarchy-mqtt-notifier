@@ -1,8 +1,9 @@
 // Turns incoming MQTT messages into stored notifications.
 //
 // Every enabled subscription whose filter matches produces its own
-// notification (no de-duplication). Parser failures never drop a message:
-// they produce a fallback notification with the raw payload and ICON_ERROR.
+// notification (no de-duplication). A parser drops a message only by
+// returning `false`. Parser failures never drop a message: they produce a
+// fallback notification with the raw payload and ICON_ERROR.
 
 import type { BrokerConfig, SubscriptionConfig } from "./config.ts"
 import type { Logger } from "./log.ts"
@@ -18,6 +19,8 @@ export interface ProcessedOutput {
   link: string | null
   /** True when the fallback policy was applied. */
   fallback: boolean
+  /** True when the script returned `false`: no notification is created. */
+  dropped: boolean
   error: string | null
   warnings: string[]
   logs: string[]
@@ -70,6 +73,7 @@ export class Processor {
     if (subs.length === 0) return
     for (const sub of subs) {
       const out = await this.render(msg.payload, this.opts.script(broker.id, sub.id))
+      if (out.dropped) continue
       if (out.error) this.opts.log.warn("parser error [" + broker.name + " / " + msg.topic + " / " + sub.id + "]: " + out.error)
       for (const w of out.warnings) this.opts.log.info("parser warning [" + broker.name + " / " + msg.topic + " / " + sub.id + "]: " + w)
       const n = await this.opts.store.add({
@@ -94,6 +98,7 @@ export class Processor {
         icon: "ICON_ERROR",
         link: null,
         fallback: true,
+        dropped: false,
         error: "payload of " + payload.byteLength + " bytes exceeds the " + max + " byte limit",
         warnings: [],
         logs: [],
@@ -103,8 +108,8 @@ export class Processor {
 
     if (script.trim() === "") {
       const checked = validateOutput({ msgout: toString(msgin) })
-      if (checked.ok) return { ...checked.value, fallback: false, error: null, logs: [] }
-      return { text: fallbackText(msgin), icon: null, link: null, fallback: false, error: null, warnings: [], logs: [] }
+      if (checked.ok) return { ...checked.value, fallback: false, dropped: false, error: null, logs: [] }
+      return { text: fallbackText(msgin), icon: null, link: null, fallback: false, dropped: false, error: null, warnings: [], logs: [] }
     }
 
     const result = await this.opts.parser.run(script, msgin)
@@ -114,10 +119,14 @@ export class Processor {
         icon: "ICON_ERROR",
         link: null,
         fallback: true,
+        dropped: false,
         error: result.error ?? "parser failed",
         warnings: [],
         logs: result.logs,
       }
+    }
+    if (result.keep === false) {
+      return { text: "", icon: null, link: null, fallback: false, dropped: true, error: null, warnings: [], logs: result.logs }
     }
     const checked = validateOutput(result)
     if (!checked.ok) {
@@ -126,11 +135,12 @@ export class Processor {
         icon: "ICON_ERROR",
         link: null,
         fallback: true,
+        dropped: false,
         error: checked.reason,
         warnings: [],
         logs: result.logs,
       }
     }
-    return { ...checked.value, fallback: false, error: null, logs: result.logs }
+    return { ...checked.value, fallback: false, dropped: false, error: null, logs: result.logs }
   }
 }

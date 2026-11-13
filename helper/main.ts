@@ -64,6 +64,10 @@ function emit(obj: Record<string, unknown>): void {
   })
 }
 log.onLog((level, message) => {
+  // Broker connection problems reach the panel as live broker state (the
+  // "brokers" event), which clears itself on reconnect. Forwarding them as log
+  // events too would leave a stale "Connection refused" in the panel.
+  if (message.startsWith("broker ")) return
   if (level === "warn" || level === "error") {
     emit({ event: "log", level, message })
   }
@@ -119,6 +123,7 @@ const parser = new ParserRunner({
 const notifier = new DesktopNotifier(
   log,
   (id) => emit({ event: "activate", id }),
+  (id, url) => emit({ event: "openLink", id, url }),
 )
 notifier.enabled = !args["no-desktop-notifications"]
 
@@ -235,6 +240,10 @@ const handlers: Record<string, (req: Req) => Promise<unknown> | unknown> = {
     }
     if (typeof s.desktopNotifications === "boolean") {
       notifier.enabled = s.desktopNotifications
+    }
+    if (typeof s.linkLabel === "string" && s.linkLabel.includes("%1")) {
+      // deno-lint-ignore no-control-regex
+      notifier.linkLabel = s.linkLabel.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 40)
     }
     emitCounts()
     return {

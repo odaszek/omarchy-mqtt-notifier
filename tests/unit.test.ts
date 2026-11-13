@@ -4,7 +4,7 @@ import { decodePayload, escapeMarkup, toString, validateLink, validateOutput } f
 import { normalizeConfig, resolveInside } from "../helper/config.ts"
 import { backoffDelay } from "../helper/mqtt_manager.ts"
 import { matchingSubscriptions } from "../helper/processor.ts"
-import { notifyArgs } from "../helper/notifier.ts"
+import { linkLine, notifyArgs } from "../helper/notifier.ts"
 import { parseXml } from "../helper/worker/xml.js"
 
 Deno.test("topic filters: wildcards", () => {
@@ -117,6 +117,35 @@ Deno.test("markup escaping for desktop notification bodies", () => {
   assert(dd > 0)
   assertEquals(args.slice(dd + 1), ["--help", "-x &lt;i&gt;"])
   assert(args.includes("--urgency=critical"))
+})
+
+Deno.test("desktop notifications: one click action; the link is an inline line like the panel's", () => {
+  const n = {
+    seq: 1,
+    id: "x",
+    timestamp: "",
+    brokerId: "b",
+    broker: "B",
+    subscriptionId: "s",
+    topic: "t",
+    text: "hi <b>",
+    icon: "ICON_NOTIFY" as const,
+    link: null as string | null,
+    read: false,
+  }
+  const plain = notifyArgs(n, "T", true)
+  assertEquals(plain.filter((a) => a.startsWith("--action")), ["--action=default=Open"])
+  assert(plain.includes("--icon=dialog-information"))
+  assertEquals(plain[plain.length - 1], "hi &lt;b&gt;")
+
+  const linked = notifyArgs({ ...n, link: "https://example.com/dash/1" }, "T", true, "Open %1")
+  assertEquals(linked.filter((a) => a.startsWith("--action")), ["--action=default=Open"])
+  assertEquals(
+    linked[linked.length - 1],
+    'hi &lt;b&gt;\n<a href="https://example.com/dash/1">\u{f0339} Open example.com</a>',
+  )
+  // A URL the daemon's anchor parser can't take is shown in full (it linkifies it).
+  assertEquals(linkLine("https://example.com/?a=1&b=2", "Open %1"), "\u{f0339} https://example.com/?a=1&amp;b=2")
 })
 
 Deno.test("backoff: exponential, capped, jittered", () => {

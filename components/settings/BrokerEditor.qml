@@ -24,6 +24,17 @@ Column {
 
   signal finished()
 
+  // Unsaved changes: any field differs from when the editor opened, or a
+  // password/passphrase was typed or marked for removal.
+  readonly property string snapshot: JSON.stringify([fName, fHost, fPort, fProtocol, fVersion, fClientId, fUsername,
+    fKeepAlive, fClean, fConnectTimeout, fReconnect, fMaxReconnect, fEnabled, fRejectUnauthorized, fCa, fCert, fKey])
+  property string initialSnapshot: ""
+  readonly property bool dirty: (initialSnapshot !== "" && snapshot !== initialSnapshot) || clearPassword
+    || passwordField.text !== "" || passphraseField.text !== ""
+  Component.onCompleted: initialSnapshot = snapshot
+  onDirtyChanged: app.dirty = dirty
+  Component.onDestruction: app.dirty = false
+
   spacing: Style.space(12)
 
   // Field values (strings for text inputs, typed on save).

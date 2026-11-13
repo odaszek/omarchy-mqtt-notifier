@@ -16,7 +16,17 @@ SettingsPage {
   title: editIndex === -1 ? s.t("settings.brokers.title") : (editIndex === -2 ? s.t("settings.brokers.add") : s.t("settings.brokers.edit"))
   subtitle: editIndex === -1 ? s.t("settings.brokers.subtitle") : ""
 
-  onEditIndexChanged: app.editing = editIndex !== -1
+  // Esc: cancel the delete confirmation if it is showing.
+  function cancelDialog() {
+    if (deleteIndex === -1) return false
+    deleteIndex = -1
+    return true
+  }
+
+  onEditIndexChanged: {
+    app.editing = editIndex !== -1
+    flick.contentY = 0
+  }
   Component.onDestruction: app.editing = false
   Component.onCompleted: {
     var edit = app.takeEdit()

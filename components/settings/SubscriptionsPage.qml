@@ -16,7 +16,19 @@ SettingsPage {
   title: editing === null ? s.t("settings.subs.title") : (editing.sub === -1 ? s.t("settings.subs.add") : s.t("settings.subs.edit"))
   subtitle: editing === null ? s.t("settings.subs.subtitle") : list[editing.broker].name
 
-  onEditingChanged: app.editing = editing !== null
+  // Esc: cancel the delete confirmation if it is showing.
+  function cancelDialog() {
+    if (deleting === null) return false
+    deleting = null
+    return true
+  }
+
+  onEditingChanged: {
+    app.editing = editing !== null
+    // The editor is much taller than the list: without this, closing it left
+    // the list scrolled out of view and the page looked empty.
+    flick.contentY = 0
+  }
   Component.onDestruction: app.editing = false
   Component.onCompleted: {
     var parts = app.takeEdit().split("/")

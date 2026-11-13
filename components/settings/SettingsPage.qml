@@ -17,7 +17,7 @@ Item {
 
   // Keyboard navigation: scroll the focused control into view.
   function ensureVisible(item) {
-    if (!item) return
+    if (!item || flick.height <= 0) return
     var p = item
     while (p && p !== column) p = p.parent
     if (!p) return
@@ -87,6 +87,16 @@ Item {
     clip: true
     boundsBehavior: Flickable.StopAtBounds
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+    // Flickable keeps contentY when the content shrinks, which can leave
+    // everything scrolled out of view; pull it back inside the bounds.
+    function clampScroll() {
+      var max = Math.max(0, contentHeight - height)
+      if (contentY > max) contentY = max
+      if (contentY < 0) contentY = 0
+    }
+    onContentHeightChanged: clampScroll()
+    onHeightChanged: clampScroll()
 
     Column {
       id: column

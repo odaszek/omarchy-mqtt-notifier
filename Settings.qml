@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Window
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import qs.Commons
 import qs.Commons as Commons
@@ -29,6 +31,8 @@ Item {
   property string section: "brokers"
   // True while a page has an editor open; config reloads wait until it closes.
   property bool editing: false
+  // True while an open editor holds changes that are not saved yet.
+  property bool dirty: false
   property bool reloadPending: false
   // Deep link from the summon payload: {"edit": "<brokerId>" | "<brokerId>/<subId>" | "new"}.
   // Consumed by the page once the config is loaded.
@@ -199,11 +203,15 @@ Item {
   Process {
     id: floatProc
     command: ["bash", "-c",
-      "for i in $(seq 1 30); do a=$(hyprctl clients -j | jq -r '.[] | select(.class==\"org.quickshell\" and (.title|startswith(\"MQTT Notifier\"))) | select(.floating|not) | .address' | head -1); "
-      + "[ -n \"$a\" ] && break; sleep 0.05; done; [ -n \"$a\" ] || exit 0; "
+      "for i in $(seq 1 30); do w=$(hyprctl clients -j | jq -r '.[] | select(.class==\"org.quickshell\" and (.title|startswith(\"MQTT Notifier\"))) | \"\\(.address) \\(.floating)\"' | head -1); "
+      + "[ -n \"$w\" ] && break; sleep 0.05; done; [ -n \"$w\" ] || exit 0; a=${w%% *}; "
+      + "if [ \"${w##* }\" = false ]; then "
       + "hyprctl dispatch \"hl.dsp.window.float({ action = \\\"on\\\", window = \\\"address:$a\\\" })\" >/dev/null; "
       + "hyprctl dispatch \"hl.dsp.window.resize({ x = 940, y = 700, window = \\\"address:$a\\\" })\" >/dev/null; "
-      + "hyprctl dispatch \"hl.dsp.window.center({ window = \\\"address:$a\\\" })\" >/dev/null"]
+      + "hyprctl dispatch \"hl.dsp.window.center({ window = \\\"address:$a\\\" })\" >/dev/null; fi; "
+      // Hyprland doesn't focus it by itself; focus it so typing works and
+      // clicking elsewhere closes it.
+      + "hyprctl dispatch \"hl.dsp.focus({ window = \\\"address:$a\\\" })\" >/dev/null"]
   }
 
   // ---- window ----
@@ -222,9 +230,38 @@ Item {
     }
 
     Item {
+      id: content
       anchors.fill: parent
       focus: true
-      Keys.onEscapePressed: if (!root.editing) root.requestClose()
+
+      // Esc closes the window from anywhere in it (a window shortcut, so a
+      // focused text field or button can't swallow it). An open confirmation
+      // dialog is cancelled first. Unsaved editor changes are discarded.
+      Shortcut {
+        sequence: "Escape"
+        context: Qt.WindowShortcut
+        onActivated: {
+          var page = pageLoader.item
+          if (page && typeof page.cancelDialog === "function" && page.cancelDialog()) return
+          root.requestClose()
+        }
+      }
+
+      // A click outside the window closes it, unless an editor has unsaved
+      // changes. Focus loss can't be used for this: with Hyprland's
+      // follow_mouse, merely moving the pointer off the window moves focus.
+      // A Hyprland focus grab keeps focus here while the pointer wanders and
+      // reports the first click outside ("cleared"). It is armed whenever the
+      // window is focused, so after leaving with unsaved changes, coming back
+      // re-arms it.
+      readonly property bool windowActive: Window.active
+      onWindowActiveChanged: if (windowActive && window.visible) outsideClick.active = true
+
+      HyprlandFocusGrab {
+        id: outsideClick
+        windows: [window]
+        onCleared: if (!root.dirty && window.visible) root.requestClose()
+      }
 
       // ---- sidebar ----
       Rectangle {
@@ -285,6 +322,7 @@ Item {
         }
 
         Loader {
+          id: pageLoader
           anchors.fill: parent
           anchors.margins: Style.space(20)
           active: root.cfg !== null && !root.pageReset

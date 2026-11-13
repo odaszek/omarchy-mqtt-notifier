@@ -57,6 +57,13 @@ Deno.test({
         (await r.run("msgout = 'early'; return; msgout = 'late'", "")).msgout,
         "early",
       )
+      // Only an explicit `return false` drops the message.
+      assertEquals((await r.run("msgout = msgin; return false", "x")).keep, false)
+      assertEquals((await r.run("msgout = msgin; return true", "x")).keep, true)
+      assertEquals((await r.run("msgout = msgin", "x")).keep, true)
+      assertEquals((await r.run("msgout = msgin; return 0", "x")).keep, true)
+      assertEquals((await r.run("msgout = msgin; return null", "x")).keep, true)
+      assertEquals((await r.run("msgout = 'n'; msgicon = ICON_NOTIFY", "")).msgicon, "ICON_NOTIFY")
     } finally {
       await r.close()
     }

@@ -12,7 +12,8 @@
 // Protocol: newline-delimited JSON on stdin/stdout.
 //   ← {"ready":true}
 //   → {"id":1,"script":"msgout = msgin","msgin":"hello"}
-//   ← {"id":1,"ok":true,"msgout":"hello","msgicon":null,"msglink":null,"logs":[]}
+//   ← {"id":1,"ok":true,"keep":true,"msgout":"hello","msgicon":null,"msglink":null,"logs":[]}
+//   ("keep" is false only when the script returned exactly `false`.)
 //   ← {"id":1,"ok":false,"error":"ReferenceError: x is not defined","logs":[]}
 
 import { parseXml } from "./xml.js"
@@ -86,6 +87,7 @@ const ICON_QUESTION = "ICON_QUESTION"
 const ICON_WARN = "ICON_WARN"
 const ICON_ERROR = "ICON_ERROR"
 const ICON_OK = "ICON_OK"
+const ICON_NOTIFY = "ICON_NOTIFY"
 
 function to_string(value) {
   if (value === null || value === undefined) return ""
@@ -186,9 +188,10 @@ function compile(script) {
     "ICON_WARN",
     "ICON_ERROR",
     "ICON_OK",
+    "ICON_NOTIFY",
     "console",
-    '"use strict";\nlet msgout = "", msgicon = null, msglink = null;\n(function () {\n' + script +
-      "\n})();\nreturn { msgout: msgout, msgicon: msgicon, msglink: msglink };",
+    '"use strict";\nlet msgout = "", msgicon = null, msglink = null;\nconst keep = (function () {\n' + script +
+      "\n})() !== false;\nreturn { keep: keep, msgout: msgout, msgicon: msgicon, msglink: msglink };",
   )
   if (cache.size >= MAX_SCRIPT_CACHE) cache.delete(cache.keys().next().value)
   cache.set(script, fn)
@@ -226,11 +229,13 @@ function run(request) {
       ICON_WARN,
       ICON_ERROR,
       ICON_OK,
+      ICON_NOTIFY,
       makeConsole(logs),
     )
     return {
       id: request.id,
       ok: true,
+      keep: out.keep === true,
       msgout: primitive(out.msgout),
       msgicon: primitive(out.msgicon),
       msglink: primitive(out.msglink),

@@ -83,10 +83,27 @@ Deno.test("rows: helper notifications become typed ListModel rows", () => {
 })
 
 Deno.test("icons: every constant has a glyph and a tone", () => {
-  for (const icon of ["ICON_QUESTION", "ICON_WARN", "ICON_ERROR", "ICON_OK"]) {
+  for (const icon of ["ICON_QUESTION", "ICON_WARN", "ICON_ERROR", "ICON_OK", "ICON_NOTIFY"]) {
     assert(Format.iconGlyph(icon).length > 0)
   }
   assertEquals(Format.iconGlyph("nope"), Format.iconGlyph(""))
   assertEquals(Format.iconTone("ICON_ERROR"), "urgent")
   assertEquals(Format.iconTone("ICON_WARN"), "accent")
+})
+
+Deno.test("formatScript: one statement per line, re-indented, strings and loops intact", () => {
+  assertEquals(
+    Format.formatScript("    msgout = 'a;b' + msgin; msgicon = ICON_NOTIFY;   msglink = null"),
+    "msgout = 'a;b' + msgin;\nmsgicon = ICON_NOTIFY;\nmsglink = null",
+  )
+  assertEquals(
+    Format.formatScript("if (x) { msgout = 'y'; return true } else { return false }"),
+    "if (x) {\n  msgout = 'y';\n  return true\n} else {\n  return false\n}",
+  )
+  assertEquals(Format.formatScript("for (var i = 0; i < 3; i++) msgout += i; // a; b"), "for (var i = 0; i < 3; i++) msgout += i; // a; b")
+  assertEquals(Format.formatScript("msgout = `a;\n   b`; x = 1"), "msgout = `a;\n   b`;\nx = 1")
+  assertEquals(Format.formatScript("if (!d) { return false } msgout = d"), "if (!d) {\n  return false\n}\nmsgout = d")
+  // Formatting is stable: a second pass changes nothing.
+  const once = Format.formatScript("var d = JSON.parse(msgin); if (d.t > 28) { msgicon = ICON_WARN } msgout = 'T: ' + d.t")
+  assertEquals(Format.formatScript(once), once)
 })

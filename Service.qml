@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.Commons as Commons
 import "lib/format.mjs" as Format
 
 // Long-lived service (manifest: kinds "service", keepLoaded). Owns the Deno
@@ -49,6 +50,19 @@ Item {
   property int openPanels: 0
 
   property ListModel items: ListModel {}
+
+  Commons.Translations {
+    id: translations
+    directory: Qt.resolvedUrl("i18n")
+  }
+
+  // A helper warning (parser error, notify-send failure) is a hint, not a
+  // state: it fades from the panel footer after a while.
+  Timer {
+    id: warningTimer
+    interval: 10 * 60 * 1000
+    onTriggered: root.lastWarning = ""
+  }
 
   // Bumped on every config reload so an open settings window can refresh.
   property int configRevision: 0
@@ -117,6 +131,9 @@ Item {
   }
 
   onMaxStoredChanged: if (helperReady) request("settings", { settings: { maxStoredMessages: maxStored } })
+  // Link line on desktop notifications, "Open %1" with the host (follows the language).
+  readonly property string linkLabel: translations.t("item.openLink", "Open %1")
+  onLinkLabelChanged: if (helperReady) request("settings", { settings: { linkLabel: linkLabel } })
   onDesktopNotificationsChanged: if (helperReady) request("settings", { settings: { desktopNotifications: desktopNotifications } })
 
   function handleLine(line) {
@@ -142,7 +159,9 @@ Item {
     case "ready":
       helperReady = true
       helperError = ""
-      request("settings", { settings: { maxStoredMessages: maxStored, desktopNotifications: desktopNotifications } })
+      lastWarning = ""
+      request("settings", { settings: { maxStoredMessages: maxStored, desktopNotifications: desktopNotifications,
+        linkLabel: linkLabel } })
       loadFirstPage()
       break
     case "brokers":
@@ -161,6 +180,13 @@ Item {
       configError = msg.error ? String(msg.error) : ""
       configRevision++
       break
+    case "openLink":
+      // A desktop notification with a link was clicked. The helper validated
+      // the URL; check it again before handing it to the desktop.
+      var url = Format.safeLink(msg.url)
+      if (url !== "") Qt.openUrlExternally(url)
+      else panelRequested()
+      break
     case "activate":
       // A desktop notification was clicked: open the panel on the focused screen.
       panelRequested()
@@ -169,7 +195,10 @@ Item {
       helperError = String(msg.error || "MQTT helper failed")
       break
     case "log":
-      if (msg.level === "error" || msg.level === "warn") lastWarning = String(msg.message || "").slice(0, 300)
+      if (msg.level === "error" || msg.level === "warn") {
+        lastWarning = String(msg.message || "").slice(0, 300)
+        warningTimer.restart()
+      }
       break
     }
   }

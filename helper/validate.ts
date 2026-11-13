@@ -1,6 +1,6 @@
 // Parser output validation, payload decoding, and the shared limits.
 
-export const ICONS = ["ICON_QUESTION", "ICON_WARN", "ICON_ERROR", "ICON_OK"] as const
+export const ICONS = ["ICON_QUESTION", "ICON_WARN", "ICON_ERROR", "ICON_OK", "ICON_NOTIFY"] as const
 export type Icon = typeof ICONS[number]
 
 export const LIMITS = {

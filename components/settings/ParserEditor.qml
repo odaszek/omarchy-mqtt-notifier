@@ -23,15 +23,17 @@ Column {
   spacing: Style.space(10)
 
   readonly property string jsonExample: "var data = JSON.parse(msgin)\n"
+    + "if (data.temperature === undefined) return false  // ignore other messages\n"
     + "msgout = \"Temperature: \" + data.temperature + \" °C\"\n"
     + "msgicon = data.temperature > 28 ? ICON_WARN : ICON_OK\n"
+    + "return true\n"
 
   function test() {
     testing = true
     result = null
     app.service.request("testParser", { script: code.text, input: sample.text }, function(ok, r) {
       testing = false
-      result = ok ? r : { text: "", icon: null, link: null, fallback: true, error: String(r), warnings: [], logs: [] }
+      result = ok ? r : { text: "", icon: null, link: null, fallback: true, dropped: false, error: String(r), warnings: [], logs: [] }
     })
   }
 
@@ -100,13 +102,16 @@ Column {
         placeholderText: root.s.t("settings.parser.placeholder")
         textFormat: TextEdit.PlainText
         placeholderTextColor: root.app.dim
-        wrapMode: TextEdit.NoWrap
+        // Long lines wrap instead of running off to the right.
+        wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
         selectByMouse: true
         persistentSelection: true
         color: root.app.foreground
         selectionColor: Util.alpha(root.app.accent, 0.35)
         font.family: "monospace"
         font.pixelSize: Style.font.body
+        // No ligatures: "===" and "!=" must look like what was typed.
+        font.features: { "liga": 0, "calt": 0 }
         background: null
         Keys.onPressed: function(event) { root.handleKey(code, event) }
       }
@@ -133,6 +138,17 @@ Column {
       accent: root.app.accent
       fontFamily: root.app.fontFamily
       onClicked: code.text = ""
+    }
+
+    Button {
+
+      focusable: true
+      text: root.s.t("settings.parser.format")
+      foreground: root.app.foreground
+      accent: root.app.accent
+      fontFamily: root.app.fontFamily
+      enabled: code.text.trim() !== ""
+      onClicked: code.text = Format.formatScript(code.text)
     }
 
     Button {
@@ -220,7 +236,8 @@ Column {
 
       PlainText {
         width: parent.width
-        text: root.result && root.result.fallback ? root.s.t("settings.parser.fallback") : root.s.t("settings.parser.preview")
+        text: root.result && root.result.dropped ? root.s.t("settings.parser.dropped")
+          : root.result && root.result.fallback ? root.s.t("settings.parser.fallback") : root.s.t("settings.parser.preview")
         color: root.result && root.result.fallback ? root.app.urgent : root.app.dim
         font.family: root.app.fontFamily
         font.pixelSize: Style.font.caption
@@ -229,6 +246,7 @@ Column {
 
       Row {
         width: parent.width
+        visible: !(root.result && root.result.dropped)
         spacing: Style.space(10)
 
         PlainText {
@@ -251,6 +269,7 @@ Column {
 
       PlainText {
         width: parent.width
+        visible: !(root.result && root.result.dropped)
         text: root.s.t("settings.parser.iconLine").arg(root.result && root.result.icon ? root.result.icon : "null")
           + "    " + root.s.t("settings.parser.linkLine").arg(root.result && root.result.link ? root.result.link : "null")
         color: root.app.dim
