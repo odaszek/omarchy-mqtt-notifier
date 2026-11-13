@@ -17,6 +17,8 @@ scripts/install.sh                   # copy into ~/.config/omarchy/plugins/odach
 scripts/install.sh --watch           # same on every save (inotifywait)
 ```
 
+The user's own machine may run the published version (`omarchy plugin add`, a git checkout in the plugin folder that `omarchy plugin update` pulls). `scripts/install.sh` replaces that folder with a plain copy, so after dev testing restore it with `omarchy plugin remove odach.mqtt-notifier --yes && omarchy plugin add https://github.com/odaszek/omarchy-mqtt-notifier.git --enable --yes` (config and history live outside the plugin folder and survive).
+
 Live manual testing (no broker is installed system-wide):
 
 ```bash
