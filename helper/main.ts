@@ -7,7 +7,7 @@
 //   replies   {"id":1,"ok":true,"result":{...}}  /  {"id":1,"ok":false,"error":"..."}
 //   events    {"event":"notification","notification":{...}}
 
-import { type Config, loadConfig, resolveInside } from "./config.ts"
+import { type Config, loadConfig, normalizeConfig, resolveInside } from "./config.ts"
 import { FileLogger } from "./log.ts"
 import { MqttManager, testConnection } from "./mqtt_manager.ts"
 import { DesktopNotifier } from "./notifier.ts"
@@ -15,6 +15,7 @@ import { ParserRunner } from "./parser.ts"
 import { Processor } from "./processor.ts"
 import { FileSecrets, KeyringSecrets, type SecretField, type SecretStore } from "./secrets.ts"
 import { DEFAULT_RETENTION, NotificationStore } from "./store.ts"
+import { editableBrokers, listFiles, readParserFiles, saveBrokers, validateBrokers } from "./settings.ts"
 
 export const VERSION = "0.1.0"
 const MAX_REQUEST_LINE = 1024 * 1024
@@ -26,8 +27,9 @@ function parseArgs(argv: string[]): Record<string, string | boolean> {
     if (!a.startsWith("--")) continue
     const eq = a.indexOf("=")
     if (eq !== -1) out[a.slice(2, eq)] = a.slice(eq + 1)
-    else if (i + 1 < argv.length && !argv[i + 1].startsWith("--")) out[a.slice(2)] = argv[++i]
-    else out[a.slice(2)] = true
+    else if (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
+      out[a.slice(2)] = argv[++i]
+    } else out[a.slice(2)] = true
   }
   return out
 }
@@ -35,7 +37,9 @@ const args = parseArgs(Deno.args)
 const configDir = String(args["config-dir"] ?? "").replace(/\/+$/, "")
 const stateDir = String(args["state-dir"] ?? "").replace(/\/+$/, "")
 if (!configDir.startsWith("/") || !stateDir.startsWith("/")) {
-  console.error("usage: main.ts --config-dir /abs/path --state-dir /abs/path [--max-stored N]")
+  console.error(
+    "usage: main.ts --config-dir /abs/path --state-dir /abs/path [--max-stored N]",
+  )
   Deno.exit(2)
 }
 const workerDir = new URL("./worker", import.meta.url).pathname
@@ -53,16 +57,24 @@ function emit(obj: Record<string, unknown>): void {
   stdoutChain = stdoutChain.then(async () => {
     try {
       let written = 0
-      while (written < line.length) written += await Deno.stdout.write(line.subarray(written))
+      while (written < line.length) {
+        written += await Deno.stdout.write(line.subarray(written))
+      }
     } catch { /* shell went away; stdin EOF will stop us */ }
   })
 }
 log.onLog((level, message) => {
-  if (level === "warn" || level === "error") emit({ event: "log", level, message })
+  if (level === "warn" || level === "error") {
+    emit({ event: "log", level, message })
+  }
 })
 
 // ---- single instance ----
-const lockFile = await Deno.open(stateDir + "/helper.lock", { create: true, write: true, mode: 0o600 })
+const lockFile = await Deno.open(stateDir + "/helper.lock", {
+  create: true,
+  write: true,
+  mode: 0o600,
+})
 const locked = await Promise.race([
   lockFile.lock(true).then(() => true),
   new Promise<boolean>((r) => setTimeout(() => r(false), 3000)),
@@ -78,7 +90,12 @@ if (!locked) {
 const retention = Number(args["max-stored"]) || DEFAULT_RETENTION
 const store = new NotificationStore(stateDir)
 await store.open(retention)
-if (store.skippedOnLoad > 0) log.warn("skipped " + store.skippedOnLoad + " unreadable history line(s); the file was rewritten")
+if (store.skippedOnLoad > 0) {
+  log.warn(
+    "skipped " + store.skippedOnLoad +
+      " unreadable history line(s); the file was rewritten",
+  )
+}
 
 let loaded = await loadConfig(configDir)
 let config: Config = loaded.config
@@ -99,7 +116,10 @@ const parser = new ParserRunner({
   log,
 })
 
-const notifier = new DesktopNotifier(log, (id) => emit({ event: "activate", id }))
+const notifier = new DesktopNotifier(
+  log,
+  (id) => emit({ event: "activate", id }),
+)
 notifier.enabled = !args["no-desktop-notifications"]
 
 let statusTimer: ReturnType<typeof setTimeout> | undefined
@@ -135,12 +155,21 @@ const processor = new Processor({
   onNotification: (n, sub, broker) => {
     emit({ event: "notification", notification: n })
     emitCounts()
-    notifier.show(n, sub.description ? broker.name + " · " + sub.description : broker.name)
+    notifier.show(
+      n,
+      sub.description ? broker.name + " · " + sub.description : broker.name,
+    )
   },
 })
 
 function emitConfig(): void {
-  emit({ event: "config", path: configDir + "/config.json", error: loaded.error, problems: config.problems, sandbox: parser.sandboxMode })
+  emit({
+    event: "config",
+    path: configDir + "/config.json",
+    error: loaded.error,
+    problems: config.problems,
+    sandbox: parser.sandboxMode,
+  })
 }
 
 async function reloadConfig(): Promise<void> {
@@ -166,12 +195,19 @@ let reloadTimer: ReturnType<typeof setTimeout> | undefined
 ;(async () => {
   try {
     for await (const ev of Deno.watchFs(configDir, { recursive: true })) {
-      if (ev.paths.every((p) => p.includes(".tmp-") || p.endsWith("~") || p.endsWith(".swp"))) continue
+      if (
+        ev.paths.every((p) => p.includes(".tmp-") || p.endsWith("~") || p.endsWith(".swp"))
+      ) continue
       clearTimeout(reloadTimer)
-      reloadTimer = setTimeout(() => reloadConfig().catch((e) => log.error("reload failed: " + e)), 300)
+      reloadTimer = setTimeout(
+        () => reloadConfig().catch((e) => log.error("reload failed: " + e)),
+        300,
+      )
     }
   } catch (e) {
-    log.warn("config watcher stopped: " + (e instanceof Error ? e.message : String(e)))
+    log.warn(
+      "config watcher stopped: " + (e instanceof Error ? e.message : String(e)),
+    )
   }
 })()
 
@@ -179,7 +215,12 @@ let reloadTimer: ReturnType<typeof setTimeout> | undefined
 // deno-lint-ignore no-explicit-any
 type Req = Record<string, any>
 
-function int(value: unknown, fallback: number, min: number, max: number): number {
+function int(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
   const n = Number(value)
   return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.floor(n))) : fallback
 }
@@ -187,13 +228,25 @@ function int(value: unknown, fallback: number, min: number, max: number): number
 const handlers: Record<string, (req: Req) => Promise<unknown> | unknown> = {
   settings: async (req) => {
     const s = req.settings && typeof req.settings === "object" ? req.settings : {}
-    if (s.maxStoredMessages !== undefined) await store.setRetention(int(s.maxStoredMessages, DEFAULT_RETENTION, 1, 100_000))
-    if (typeof s.desktopNotifications === "boolean") notifier.enabled = s.desktopNotifications
+    if (s.maxStoredMessages !== undefined) {
+      await store.setRetention(
+        int(s.maxStoredMessages, DEFAULT_RETENTION, 1, 100_000),
+      )
+    }
+    if (typeof s.desktopNotifications === "boolean") {
+      notifier.enabled = s.desktopNotifications
+    }
     emitCounts()
-    return { retention: store.retention, desktopNotifications: notifier.enabled }
+    return {
+      retention: store.retention,
+      desktopNotifications: notifier.enabled,
+    }
   },
   page: (req) =>
-    store.page(int(req.limit, 10, 1, 500), req.beforeSeq === undefined || req.beforeSeq === null ? undefined : Number(req.beforeSeq)),
+    store.page(
+      int(req.limit, 10, 1, 500),
+      req.beforeSeq === undefined || req.beforeSeq === null ? undefined : Number(req.beforeSeq),
+    ),
   markAllRead: async () => {
     const through = await store.markAllRead()
     emitCounts()
@@ -229,14 +282,79 @@ const handlers: Record<string, (req: Req) => Promise<unknown> | unknown> = {
     const input = typeof req.input === "string" ? req.input : ""
     return await processor.render(new TextEncoder().encode(input), script)
   },
+  // Either a saved broker ({brokerId}) or an unsaved draft from the settings
+  // window ({broker, password?}); a draft password is used for this test only.
   testConnection: async (req) => {
-    const broker = config.brokers.find((b) => b.id === req.brokerId)
+    let broker = req.broker && typeof req.broker === "object" ? normalizeConfig({ brokers: [req.broker] }).brokers[0] : null
+    if (!broker) {
+      broker = config.brokers.find((b) => b.id === req.brokerId) ?? null
+    }
     if (!broker) throw new Error("unknown broker " + String(req.brokerId))
-    return await testConnection(broker, { certsDir: configDir + "/certs", secrets, log })
+    const draftPassword = typeof req.password === "string" && req.password !== "" ? req.password : null
+    const testSecrets: SecretStore = draftPassword === null ? secrets : {
+      get: (id, field) => field === "password" ? Promise.resolve(draftPassword) : secrets.get(id, field),
+      set: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
+    }
+    return await testConnection(broker, {
+      certsDir: configDir + "/certs",
+      secrets: testSecrets,
+      log,
+    })
   },
+  getConfig: async () => {
+    const secretState: Record<
+      string,
+      { password: boolean; keyPassphrase: boolean }
+    > = {}
+    for (const b of config.brokers) {
+      secretState[b.id] = {
+        password: (await secrets.get(b.id, "password")) !== null,
+        keyPassphrase: b.tls.key ? (await secrets.get(b.id, "keyPassphrase")) !== null : false,
+      }
+    }
+    return {
+      path: configDir + "/config.json",
+      error: loaded.error,
+      problems: config.problems,
+      brokers: editableBrokers(config.brokers),
+      secrets: secretState,
+      secretStore: config.advanced.secretStore,
+      parserFiles: await readParserFiles(configDir, config.brokers),
+      certs: await listFiles(configDir + "/certs"),
+    }
+  },
+  saveConfig: async (req) => {
+    const errors = validateBrokers(req.brokers)
+    if (errors.length > 0) return { saved: false, errors }
+    const parserFiles = req.parserFiles && typeof req.parserFiles === "object" ? req.parserFiles : {}
+    const { removedBrokerIds } = await saveBrokers(
+      configDir,
+      req.brokers,
+      parserFiles,
+    )
+    for (const id of removedBrokerIds) {
+      try {
+        await secrets.remove(id, "password")
+        await secrets.remove(id, "keyPassphrase")
+      } catch (e) {
+        log.warn(
+          "could not remove secrets of deleted broker " + id + ": " +
+            (e instanceof Error ? e.message : String(e)),
+        )
+      }
+    }
+    await reloadConfig()
+    return { saved: true, errors: [], problems: config.problems }
+  },
+  listExports: async () => ({
+    dir: exportsDir,
+    files: (await listFiles(exportsDir)).reverse(),
+  }),
   export: async () => {
     await Deno.mkdir(exportsDir, { recursive: true, mode: 0o700 })
-    const path = exportsDir + "/history-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json"
+    const path = exportsDir + "/history-" +
+      new Date().toISOString().replace(/[:.]/g, "-") + ".json"
     const count = await store.exportTo(path)
     return { path, count }
   },
@@ -249,12 +367,16 @@ const handlers: Record<string, (req: Req) => Promise<unknown> | unknown> = {
   },
   setSecret: async (req) => {
     const field = secretField(req.field)
-    if (typeof req.brokerId !== "string" || typeof req.value !== "string") throw new Error("brokerId and value are required")
+    if (typeof req.brokerId !== "string" || typeof req.value !== "string") {
+      throw new Error("brokerId and value are required")
+    }
     await secrets.set(req.brokerId, field, req.value)
     return {}
   },
   clearSecret: async (req) => {
-    if (typeof req.brokerId !== "string") throw new Error("brokerId is required")
+    if (typeof req.brokerId !== "string") {
+      throw new Error("brokerId is required")
+    }
     await secrets.remove(req.brokerId, secretField(req.field))
     return {}
   },
@@ -289,7 +411,12 @@ async function handle(line: string): Promise<void> {
 // ---- start ----
 for (const p of config.problems) log.warn("config: " + p)
 if (loaded.error) log.warn(loaded.error)
-emit({ event: "ready", version: VERSION, configPath: configDir + "/config.json", statePath: stateDir })
+emit({
+  event: "ready",
+  version: VERSION,
+  configPath: configDir + "/config.json",
+  statePath: stateDir,
+})
 emitConfig()
 emitCounts()
 await manager.apply(config.brokers)
@@ -301,7 +428,10 @@ let shuttingDown = false
 async function shutdown(code: number): Promise<never> {
   if (!shuttingDown) {
     shuttingDown = true
-    await Promise.race([Promise.allSettled([...inFlight]), new Promise((r) => setTimeout(r, 5000))])
+    await Promise.race([
+      Promise.allSettled([...inFlight]),
+      new Promise((r) => setTimeout(r, 5000)),
+    ])
     try {
       await manager.stop()
     } catch { /* ignore */ }
@@ -323,7 +453,9 @@ for (const sig of ["SIGTERM", "SIGINT", "SIGHUP"] as const) {
 
 let buffer = ""
 let discarding = false
-for await (const chunk of Deno.stdin.readable.pipeThrough(new TextDecoderStream())) {
+for await (
+  const chunk of Deno.stdin.readable.pipeThrough(new TextDecoderStream())
+) {
   buffer += chunk
   let nl
   while ((nl = buffer.indexOf("\n")) !== -1) {

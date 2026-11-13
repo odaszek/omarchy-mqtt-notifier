@@ -27,6 +27,10 @@ Output from the plugin's own `console.log` doesn't appear in the shell log. Use 
 
 **Duplicate notifications with MQTT 3.1.1 and overlapping filters.** Some brokers send one copy per matching subscription, and with 3.1.1 the client can't tell the copies apart. Use `"mqttVersion": 5`, which identifies each delivery's subscription.
 
+**`omarchy-shell shell summon odach.mqtt-notifier` opens settings, not the bell panel.** That's intended: a plugin with a settings window ("panel" entry point) has `summon` routed to that window. Click the bell, or a desktop notification, to open the panel.
+
+**The settings window opens tiled.** It floats itself right after opening with `hyprctl` (a title-based window rule doesn't match Quickshell windows at map time). If `hyprctl` or `jq` is missing it stays tiled; float it with your usual key.
+
 **Parser changes don't apply.** The helper reloads `config.json` and `parsers/*.js` when they're saved. Check the log for `config:` problems; a file outside `parsers/` is refused.
 
 **Edits to the plugin code don't show up.** The shell caches compiled QML and JS and keeps the MQTT service loaded across plugin reloads. Run `scripts/install.sh` (it restarts the shell) or `omarchy restart shell`.

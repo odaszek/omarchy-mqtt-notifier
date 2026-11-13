@@ -6,7 +6,7 @@
     "check": "deno check main.ts",
     "lint": "deno lint",
     "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys ../tests/",
-    "fmt": "deno fmt . ../tests ../lib"
+    "fmt": "deno fmt --config deno.json . ../tests ../lib"
   },
   "lint": {
     "exclude": ["worker/"]

@@ -26,9 +26,21 @@ Running it again updates the plugin and restarts the shell (`omarchy restart she
 
 Uninstall with `scripts/uninstall.sh`. Add `--purge` to also delete config, history, logs and keyring secrets.
 
-## Configure brokers
+## Settings window
 
-The first start creates `~/.config/omarchy/mqtt-notifier/config.json` with one disabled example broker. The gear button in the panel opens it in your editor, and the helper reloads it when you save.
+The gear button in the panel opens a floating settings window:
+
+- **General:** panel size, page sizes, desktop notifications, unread counter, mark-read-on-open (written to `shell.json`).
+- **Brokers:** add, edit, delete and enable brokers, with live connection status (green connected, yellow connecting, red unreachable, grey disabled) and **Test connection** for unsaved changes. Passwords go straight to the keyring.
+- **Subscriptions:** grouped by broker, each with a parser editor (Tab indents, Ctrl+Tab leaves the editor) and a **Test parser** bench that runs your script in the same sandbox as live messages without storing anything.
+- **Storage:** history size, clear, export to JSON, import an export.
+- **About:** version, helper and sandbox status, file locations.
+
+From scripts: `omarchy-shell shell summon odach.mqtt-notifier '{"section":"brokers"}'`. Add `"edit":"<brokerId>"`, `"edit":"new"` (Brokers) or `"edit":"<brokerId>/<subId>"` / `"<brokerId>/new"` (Subscriptions) to open an editor directly.
+
+## Configure brokers by hand
+
+Everything in the settings window is stored in `~/.config/omarchy/mqtt-notifier/config.json` (created on first start with a disabled example). You can edit it directly; the helper reloads it on save and the settings window refreshes. Saving from the window keeps keys it doesn't manage (such as `advanced`), and refuses to overwrite a file with a JSON syntax error.
 
 ```json
 {
@@ -125,7 +137,7 @@ Example: `omarchy bar set odach.mqtt-notifier maxStoredMessages 5000 --json`
 
 - **Left-click** the bell to open or close the panel. **Middle-click** reconnects all brokers now.
 - **Keyboard:** ↑/↓ (or k/j) select a row; going past the last row loads more. Enter or Space opens the selected link. `x` or Delete starts Clear All. Esc closes. Tab moves to the neighbouring panel.
-- **From scripts:** `omarchy-shell shell summon odach.mqtt-notifier` opens the panel on the focused screen.
+- **From scripts:** `omarchy-shell shell summon odach.mqtt-notifier` opens the settings window (see above). Clicking a desktop notification opens the bell panel on the focused screen.
 - Opening the panel marks everything already received as read. Messages that arrive while it's open stay unread.
 
 ## Files
@@ -161,6 +173,6 @@ Further docs: [dependencies](docs/dependencies.md), [troubleshooting](docs/troub
 
 | Done | Not done yet |
 |---|---|
-| Bar widget, panel, MQTT service, sandboxed parsers, JSONL history, desktop notifications, settings form (manifest schema), install/uninstall scripts, tests | In-shell settings screens for brokers, subscriptions and the parser editor (spec §12.2–12.6). Until then, edit `config.json`. The helper already supports `testParser`, `testConnection`, `export`, `import` and `setSecret` for those screens. |
+| Bar widget, panel, MQTT service, sandboxed parsers, JSONL history, desktop notifications, settings window (general, brokers, subscriptions with parser editor and test, storage, about), install/uninstall scripts, tests | Syntax highlighting in the parser editor (QML has no built-in highlighter; it would need a C++ helper). Importing files from outside the `exports/` folder. |
 
 This has only been tested on Omarchy 4.5.0 (Quickshell 0.3.2, Qt 6.12, Deno 2.9.8).

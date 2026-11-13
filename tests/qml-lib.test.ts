@@ -3,8 +3,14 @@ import { assert, assertEquals } from "jsr:@std/assert@1"
 import * as Format from "../lib/format.mjs"
 
 Deno.test("safeLink: second check before opening a URL", () => {
-  assertEquals(Format.safeLink("https://example.com/a?b=1#c"), "https://example.com/a?b=1#c")
-  assertEquals(Format.safeLink("http://192.168.1.10:8123/lovelace"), "http://192.168.1.10:8123/lovelace")
+  assertEquals(
+    Format.safeLink("https://example.com/a?b=1#c"),
+    "https://example.com/a?b=1#c",
+  )
+  assertEquals(
+    Format.safeLink("http://192.168.1.10:8123/lovelace"),
+    "http://192.168.1.10:8123/lovelace",
+  )
   assertEquals(Format.safeLink("javascript:alert(1)"), "")
   assertEquals(Format.safeLink("file:///etc/passwd"), "")
   assertEquals(Format.safeLink("https://user:pw@example.com/"), "")
@@ -19,18 +25,34 @@ Deno.test("broker warnings: down or failing brokers only", () => {
   const brokers = [
     { id: "a", enabled: true, state: "connected", error: null },
     { id: "b", enabled: true, state: "connecting", error: null }, // first attempt: no warning yet
-    { id: "c", enabled: true, state: "connecting", error: "Connection refused" }, // retrying after failure
+    {
+      id: "c",
+      enabled: true,
+      state: "connecting",
+      error: "Connection refused",
+    }, // retrying after failure
     { id: "d", enabled: true, state: "disconnected", error: "Connection lost" },
     { id: "e", enabled: true, state: "error", error: "Invalid configuration" },
     { id: "f", enabled: false, state: "disabled", error: null },
   ]
-  assertEquals(Format.brokerWarnings(brokers).map((b: { id: string }) => b.id), ["c", "d", "e"])
+  assertEquals(
+    Format.brokerWarnings(brokers).map((b: { id: string }) => b.id),
+    ["c", "d", "e"],
+  )
   assertEquals(Format.brokerWarnings(null), [])
 })
 
 Deno.test("settings: entry lookup and clamping", () => {
-  const bar = { layout: { left: [{ id: "omarchy.menu" }], right: [{ id: "odach.mqtt-notifier", initialMessageCount: 5 }] } }
-  assertEquals(Format.findEntrySettings(bar, "odach.mqtt-notifier").initialMessageCount, 5)
+  const bar = {
+    layout: {
+      left: [{ id: "omarchy.menu" }],
+      right: [{ id: "odach.mqtt-notifier", initialMessageCount: 5 }],
+    },
+  }
+  assertEquals(
+    Format.findEntrySettings(bar, "odach.mqtt-notifier").initialMessageCount,
+    5,
+  )
   assertEquals(Format.findEntrySettings(bar, "missing"), {})
   assertEquals(Format.findEntrySettings(null, "x"), {})
   assertEquals(Format.clampInt("7", 10, 1, 200), 7)
@@ -55,7 +77,9 @@ Deno.test("rows: helper notifications become typed ListModel rows", () => {
   assertEquals(row.link, "")
   assertEquals(row.body, "<b>x</b>") // kept verbatim; the view renders it as plain text
   assertEquals(row.read, false)
-  for (const value of Object.values(row)) assert(value !== null && value !== undefined)
+  for (const value of Object.values(row)) {
+    assert(value !== null && value !== undefined)
+  }
 })
 
 Deno.test("icons: every constant has a glyph and a tone", () => {

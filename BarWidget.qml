@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import Quickshell
+import Quickshell.Hyprland
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
@@ -50,6 +51,17 @@ Panel {
 
   // A widget torn down while open (bar reload, monitor unplugged) still counts as closing.
   Component.onDestruction: if (opened && service) service.panelClosed()
+
+  // Desktop notification clicked: only the widget on the focused screen opens.
+  Connections {
+    target: root.service
+    function onPanelRequested() {
+      var monitor = Hyprland.focusedMonitor
+      var window = root.QsWindow.window
+      var mine = window && window.screen ? String(window.screen.name || "") : ""
+      if (!monitor || mine === "" || mine === String(monitor.name || "")) root.open()
+    }
+  }
 
   onOpenedChanged: {
     if (!service) return
@@ -293,8 +305,8 @@ Panel {
             foreground: root.foreground
             fontFamily: root.fontFamily
             onClicked: {
-              root.service.openConfig()
               root.close()
+              root.service.openSettings("")
             }
           }
         }

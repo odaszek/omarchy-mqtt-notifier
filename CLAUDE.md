@@ -22,7 +22,7 @@ Live manual testing (no broker is installed system-wide):
 ```bash
 deno run --allow-net --allow-env --allow-read --allow-sys tests/tools/broker.ts 18830 &   # aedes dev broker
 deno run --allow-net --allow-env --allow-read --allow-sys tests/tools/publish.ts --port 18830 test/x "hello"
-omarchy-shell shell summon odach.mqtt-notifier   # open the panel on the focused screen
+omarchy-shell shell summon odach.mqtt-notifier '{"section":"subscriptions","edit":"dev/climate"}'   # settings window, deep-linked
 omarchy-shell notifications act                  # "click" the newest desktop notification
 ```
 
@@ -32,9 +32,10 @@ Point a broker in `~/.config/omarchy/mqtt-notifier/config.json` at `127.0.0.1:18
 
 Three processes, each with less privilege than the one before:
 
-1. **QML, inside `omarchy-shell`.** `manifest.json` declares `kinds: ["service", "bar-widget"]` with `keepLoaded: true`.
+1. **QML, inside `omarchy-shell`.** `manifest.json` declares `kinds: ["service", "bar-widget", "panel"]` with `keepLoaded: true`.
    - `Service.qml` is a single, parentless, long-lived object. It owns the helper `Process`, holds all state (`brokers`, `unread`, `total`, the `items` ListModel), and exposes the functions the widgets call. Settings come from the widget's inline entry in `shell.json` (`shell.barConfig` → `Format.findEntrySettings`), and the manifest `barWidget.schema` describes them.
    - `BarWidget.qml` (`qs.Ui.Panel`, one instance per bar/screen) is a view. It finds the service with `bar.shell.serviceFor(id)`, polled until it appears, and renders a `BarIconButton` plus a `KeyboardPanel` built from `components/`.
+   - `Settings.qml` (the `panel` entry point) is a `FloatingWindow` the shell loads on `summon` and destroys on `hide`. The loader injects `service`. Pages live in `components/settings/` and get the window root as `app`. They read `app.cfg` (helper `getConfig`) and write whole broker lists through `app.saveBrokers()` (helper `saveConfig`); widget settings go through `service.updateSetting()` into `shell.json`. Deep links: summon payload `{"section", "edit"}`.
    - `lib/format.mjs` holds pure logic as an ES module shared by QML and the Deno tests. Keep Qt APIs out of it.
 2. **Deno helper** (`helper/main.ts`, started via `helper/start.sh`). It speaks NDJSON over stdin/stdout (`docs/ipc.md`) and is the single writer of history.
    - `mqtt_manager.ts`: one connection per broker, with its own exponential backoff (mqtt.js `reconnectPeriod: 0`). For MQTT 5 it maps subscription identifiers back to filters.
@@ -53,6 +54,8 @@ Three processes, each with less privilege than the one before:
 - **Third-party plugins can't register IPC targets.** A `ShellIpc` in plugin QML never shows up in `qs ipc show`. Use `omarchy-shell shell summon <id>` to open the panel.
 - **Plugin `console.log` output doesn't reach the shell log** (`qs log …/log.qslog`). Debug through the helper log (`~/.local/state/omarchy/mqtt-notifier/logs/helper.log`) or show values in the UI temporarily.
 - `omarchy-shell shell rescanPlugins` freezes the shell for about 2 s (with or without this plugin), and IPC calls then answer "omarchy-shell is not responding". Retry after a moment.
+- **Adding a `panel` kind reroutes `shell.summon(<id>)`** from the bar widget to the panel loader. So a desktop-notification click opens the bell through `service.panelRequested()`: each widget compares its screen with `Hyprland.focusedMonitor`.
+- **Quickshell `FloatingWindow`s tile, and Hyprland title rules don't match them at map time.** `Settings.qml` floats itself with `hyprctl dispatch 'hl.dsp.window.float({...window = "address:0x…"})'`. Hyprland here uses the Lua config, so old `hyprctl dispatch setfloating …` syntax fails, and `title:` window selectors don't work; use the address.
 - `PanelKeyCatcher` owns `Keys.onPressed`. Hand keys to overlays (`ConfirmDialog`) via `blocked` + `focus` instead of a second handler.
 
 ## Rules for changes
@@ -62,4 +65,4 @@ Three processes, each with less privilege than the one before:
 - User-visible strings go in `i18n/en.json` and are read with `strings.t()` / `strings.tn()` inside bindings. Logs stay in English. Durations use `Style.duration()`.
 - Integration tests launch the real helper through `start.sh` with `--no-desktop-notifications`. Keep that flag so test runs don't spam the desktop.
 - The spec in the original request (multi-broker MQTT, JS parsers, JSONL history) is the product requirement. Deliberate deviations: the popup is an Omarchy `KeyboardPanel` anchored to the icon rather than pinned to the screen's right edge; read state is a cursor rather than per-line flags; files live in `~/.config/omarchy/mqtt-notifier` and `~/.local/state/omarchy/mqtt-notifier`; `ignoreRetained` defaults to true.
-- Not built yet: the in-shell settings screens (brokers, subscriptions, parser editor/test, storage import/export; spec §12.2–12.6). The helper ops they need (`testParser`, `testConnection`, `export`, `import`, `setSecret`) already exist.
+- Not built: syntax highlighting in the parser editor (would need a C++ `QSyntaxHighlighter`). Settings buttons set `focusable: true` and text areas must never trap Tab, so keep both when adding controls. `/usr/lib/qt6/bin/qmllint -I <dir containing qs -> /usr/share/omarchy/shell>` catches misspelled properties; `/usr/bin/qmllint` is the Qt 5 one and useless here.

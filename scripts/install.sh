@@ -19,7 +19,7 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 plugins="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins"
 target="$plugins/$id"
 staging="$plugins/.$id.staging"
-files=(manifest.json Service.qml BarWidget.qml components lib i18n helper README.md)
+files=(manifest.json Service.qml BarWidget.qml Settings.qml components lib i18n helper README.md)
 
 watch=false
 enable=true

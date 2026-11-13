@@ -50,6 +50,14 @@ Item {
 
   property ListModel items: ListModel {}
 
+  // Bumped on every config reload so an open settings window can refresh.
+  property int configRevision: 0
+
+  // A widget on the focused screen opens its panel (desktop notification click).
+  // `shell.summon` cannot be used for this: with a "panel" entry point the
+  // shell routes summon to the settings window.
+  signal panelRequested()
+
   // ---- helper process ----
   property int nextRequestId: 1
   property var pending: ({})
@@ -151,10 +159,11 @@ Item {
     case "config":
       configProblems = Array.isArray(msg.problems) ? msg.problems.slice(0, 20) : []
       configError = msg.error ? String(msg.error) : ""
+      configRevision++
       break
     case "activate":
       // A desktop notification was clicked: open the panel on the focused screen.
-      if (shell) shell.summon(pluginId, "")
+      panelRequested()
       break
     case "fatal":
       helperError = String(msg.error || "MQTT helper failed")
@@ -267,5 +276,17 @@ Item {
 
   function openConfig() {
     Quickshell.execDetached(["omarchy-launch-config-editor", configPath])
+  }
+
+  function openSettings(section) {
+    if (shell) shell.summon(pluginId, JSON.stringify({ section: section || "" }))
+  }
+
+  // Widget settings live in this plugin's inline shell.json entry.
+  function updateSetting(key, value) {
+    if (!shell || typeof shell.updateEntryInline !== "function") return false
+    var next = Object.assign({}, settings)
+    next[key] = value
+    return shell.updateEntryInline(pluginId, next)
   }
 }

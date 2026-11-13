@@ -19,7 +19,9 @@ if (!topic) {
   console.error("usage: publish.ts [--port N] [--retain] <topic> <payload>")
   Deno.exit(2)
 }
-const client = mqtt.connect("mqtt://127.0.0.1:" + port, { clientId: "dev-publisher-" + crypto.randomUUID().slice(0, 6) })
+const client = mqtt.connect("mqtt://127.0.0.1:" + port, {
+  clientId: "dev-publisher-" + crypto.randomUUID().slice(0, 6),
+})
 client.on("connect", () => {
   client.publish(topic, payload, { qos: 1, retain }, (err) => {
     if (err) console.error(err)

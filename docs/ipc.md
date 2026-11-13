@@ -17,7 +17,10 @@
 | `reload` | – | Re-read `config.json` now. |
 | `reconnect` | – | Reconnect every enabled broker that isn't connected. |
 | `testParser` | `script`, `input` | `{text, icon, link, fallback, error, warnings, logs}`. Nothing is stored. |
-| `testConnection` | `brokerId` | `{ok, error, ms}`, using a separate client id. |
+| `testConnection` | `brokerId`, or `broker` (an unsaved draft) + optional `password` | `{ok, error, ms}`, using a separate client id. A draft password is used for this test only. |
+| `getConfig` | – | `{path, error, problems, brokers, secrets: {<id>: {password, keyPassphrase}}, secretStore, parserFiles: {<file>: text}, certs: [names]}`. Secrets are reported as present/absent only. |
+| `saveConfig` | `brokers`, `parserFiles?` | `{saved, errors: [{path, message}], problems}`. Validates, writes `config.json` atomically (keeping other top-level keys), writes `parsers/<file>`, clears keyring secrets of removed brokers, reloads. |
+| `listExports` | – | `{dir, files}`, newest first |
 | `export` | – | `{path, count}`, written to `STATE_DIR/exports/`. |
 | `import` | `path` (inside `STATE_DIR/exports/`) | `{imported, skipped}` |
 | `setSecret` | `brokerId`, `field` (`password`/`keyPassphrase`), `value` | `{}` |

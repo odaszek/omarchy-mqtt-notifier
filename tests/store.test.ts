@@ -1,7 +1,15 @@
 import { assert, assertEquals } from "jsr:@std/assert@1"
 import { NotificationStore } from "../helper/store.ts"
 
-const input = (text: string) => ({ brokerId: "b", broker: "B", subscriptionId: "s", topic: "t/x", text, icon: null, link: null })
+const input = (text: string) => ({
+  brokerId: "b",
+  broker: "B",
+  subscriptionId: "s",
+  topic: "t/x",
+  text,
+  icon: null,
+  link: null,
+})
 
 async function tempStore(retention = 1000): Promise<NotificationStore> {
   const dir = await Deno.makeTempDir({ prefix: "mqttn-store-" })
@@ -14,7 +22,18 @@ Deno.test("store: append, page newest first, cursor pagination without duplicate
   const store = await tempStore()
   for (let i = 1; i <= 25; i++) await store.add(input("m" + i))
   const p1 = store.page(10)
-  assertEquals(p1.items.map((n) => n.text), ["m25", "m24", "m23", "m22", "m21", "m20", "m19", "m18", "m17", "m16"])
+  assertEquals(p1.items.map((n) => n.text), [
+    "m25",
+    "m24",
+    "m23",
+    "m22",
+    "m21",
+    "m20",
+    "m19",
+    "m18",
+    "m17",
+    "m16",
+  ])
   assert(p1.hasMore)
   // A message arriving between pages must not shift the next page.
   await store.add(input("m26"))
@@ -39,7 +58,10 @@ Deno.test("store: history survives reopen; read cursor semantics", async () => {
   const again = new NotificationStore(store.dir)
   await again.open()
   const page = again.page(10)
-  assertEquals(page.items.map((n) => [n.text, n.read]), [["new", false], ["old2", true], ["old1", true]])
+  assertEquals(page.items.map((n) => [n.text, n.read]), [["new", false], [
+    "old2",
+    true,
+  ], ["old1", true]])
   assertEquals(again.unread, 1)
 })
 
@@ -48,19 +70,38 @@ Deno.test("store: retention trims oldest and compacts the file", async () => {
   for (let i = 1; i <= 40; i++) await store.add(input("m" + i))
   await store.flush()
   assertEquals(store.total, 5)
-  assertEquals(store.page(10).items.map((n) => n.text), ["m40", "m39", "m38", "m37", "m36"])
+  assertEquals(store.page(10).items.map((n) => n.text), [
+    "m40",
+    "m39",
+    "m38",
+    "m37",
+    "m36",
+  ])
   const lines = (await Deno.readTextFile(store.file)).trim().split("\n")
-  assert(lines.length <= 5 + 20, "file is compacted with bounded slack (" + lines.length + " lines)")
+  assert(
+    lines.length <= 5 + 20,
+    "file is compacted with bounded slack (" + lines.length + " lines)",
+  )
 
   await store.setRetention(2)
   assertEquals(store.page(10).items.map((n) => n.text), ["m40", "m39"])
-  assertEquals((await Deno.readTextFile(store.file)).trim().split("\n").length, 2)
+  assertEquals(
+    (await Deno.readTextFile(store.file)).trim().split("\n").length,
+    2,
+  )
 })
 
 Deno.test("store: corrupted lines do not prevent loading valid records", async () => {
   const dir = await Deno.makeTempDir({ prefix: "mqttn-store-" })
   const good = (id: string, text: string) =>
-    JSON.stringify({ id, timestamp: "2026-11-13T05:51:04.123Z", brokerId: "b", broker: "B", topic: "t", text })
+    JSON.stringify({
+      id,
+      timestamp: "2026-11-13T05:51:04.123Z",
+      brokerId: "b",
+      broker: "B",
+      topic: "t",
+      text,
+    })
   await Deno.writeTextFile(
     dir + "/notifications.jsonl",
     [
@@ -76,7 +117,10 @@ Deno.test("store: corrupted lines do not prevent loading valid records", async (
   assertEquals(store.skippedOnLoad, 3)
   assertEquals(store.page(10).items.map((n) => n.text), ["second", "first"])
   // The file was rewritten without the bad lines.
-  assertEquals((await Deno.readTextFile(store.file)).trim().split("\n").length, 2)
+  assertEquals(
+    (await Deno.readTextFile(store.file)).trim().split("\n").length,
+    2,
+  )
 })
 
 Deno.test("store: clear removes history and resets unread; seq keeps growing", async () => {

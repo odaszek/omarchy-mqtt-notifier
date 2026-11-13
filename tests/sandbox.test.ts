@@ -7,7 +7,10 @@ import { MemoryLogger } from "../helper/log.ts"
 
 const workerDir = new URL("../helper/worker", import.meta.url).pathname
 
-function runner(sandbox: "auto" | "deno" = "auto", timeoutMs = 500): ParserRunner {
+function runner(
+  sandbox: "auto" | "deno" = "auto",
+  timeoutMs = 500,
+): ParserRunner {
   return new ParserRunner({
     timeoutMs,
     memoryMb: 64,
@@ -45,9 +48,15 @@ Deno.test({
       )
       assertEquals(xml.msgout, "warning")
       assertEquals(xml.logs, ["log: t 29.5"])
-      assertEquals((await r.run("msgout = to_string(msgin)", "plain")).msgout, "plain")
+      assertEquals(
+        (await r.run("msgout = to_string(msgin)", "plain")).msgout,
+        "plain",
+      )
       // `return` ends the script early and keeps what was set so far.
-      assertEquals((await r.run("msgout = 'early'; return; msgout = 'late'", "")).msgout, "early")
+      assertEquals(
+        (await r.run("msgout = 'early'; return; msgout = 'late'", "")).msgout,
+        "early",
+      )
     } finally {
       await r.close()
     }
@@ -74,7 +83,11 @@ Deno.test({
       for (const [name, script] of Object.entries(probes)) {
         const out = await r.run(script, "")
         assert(out.ok, name + ": " + out.error)
-        assertFalse(String(out.msgout).includes("function") || String(out.msgout).includes("object"), name + " leaked: " + out.msgout)
+        assertFalse(
+          String(out.msgout).includes("function") ||
+            String(out.msgout).includes("object"),
+          name + " leaked: " + out.msgout,
+        )
       }
       // Dynamic import (if it resolves at all) must not reach the filesystem.
       const imp = await r.run("msgout = 'started'", "")
@@ -92,7 +105,10 @@ Deno.test({
   fn: async () => {
     const r = runner()
     try {
-      const writeGlobal = await r.run("globalThis.secret = msgin; msgout = 'x'", "s3cret")
+      const writeGlobal = await r.run(
+        "globalThis.secret = msgin; msgout = 'x'",
+        "s3cret",
+      )
       assertFalse(writeGlobal.ok)
       const sloppy = await r.run("leak = 1; msgout = 'x'", "")
       assertFalse(sloppy.ok)
@@ -100,7 +116,10 @@ Deno.test({
       assertFalse(proto.ok)
       const arr = await r.run("Array.prototype.map = null; msgout = 'x'", "")
       assertFalse(arr.ok)
-      const check = await r.run("msgout = typeof globalThis.secret + ' ' + JSON.parse('\"ok\"') + ' ' + typeof [].map", "")
+      const check = await r.run(
+        "msgout = typeof globalThis.secret + ' ' + JSON.parse('\"ok\"') + ' ' + typeof [].map",
+        "",
+      )
       assertEquals(check.msgout, "undefined ok function")
     } finally {
       await r.close()
@@ -120,7 +139,10 @@ Deno.test({
       assertStringIncludes(loop.error ?? "", "timed out")
       assertEquals((await r.run("msgout = msgin", "next")).msgout, "next")
 
-      const oom = await r.run("var a = []; for (;;) a.push(new Array(1e6).fill(1))", "")
+      const oom = await r.run(
+        "var a = []; for (;;) a.push(new Array(1e6).fill(1))",
+        "",
+      )
       assertFalse(oom.ok)
       assertEquals((await r.run("msgout = msgin", "after")).msgout, "after")
 

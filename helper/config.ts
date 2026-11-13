@@ -97,8 +97,8 @@ export const EXAMPLE_CONFIG = {
   advanced: DEFAULT_ADVANCED,
 }
 
-const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
-const HOST_RE = /^[A-Za-z0-9._:-]{1,253}$|^\[[0-9A-Fa-f:.]+\]$/
+export const ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/
+export const HOST_RE = /^[A-Za-z0-9._:-]{1,253}$|^\[[0-9A-Fa-f:.]+\]$/
 
 function obj(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
