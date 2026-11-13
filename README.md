@@ -11,9 +11,15 @@ A bar widget for the Omarchy 4.5 shell that turns MQTT messages into notificatio
 
 ## Install
 
+Requires Omarchy 4.5 and `git`. Clone the repository anywhere and run the installer from it:
+
 ```bash
+git clone https://github.com/odaszek/omarchy-mqtt-notifier.git
+cd omarchy-mqtt-notifier
 scripts/install.sh
 ```
+
+To update later: `git pull && scripts/install.sh` in the same folder.
 
 The script:
 
@@ -177,3 +183,7 @@ Further docs: [dependencies](docs/dependencies.md), [troubleshooting](docs/troub
 | Bar widget, panel, MQTT service, sandboxed parsers, JSONL history, desktop notifications, settings window (general, brokers, subscriptions with parser editor and test, storage, about), install/uninstall scripts, tests | Syntax highlighting in the parser editor (QML has no built-in highlighter; it would need a C++ helper). Importing files from outside the `exports/` folder. |
 
 This has only been tested on Omarchy 4.5.0 (Quickshell 0.3.2, Qt 6.12, Deno 2.9.8).
+
+## License
+
+[MIT](LICENSE): you may use, copy, modify and share it, including in your own projects, as long as the copyright and license notice stay with it.
