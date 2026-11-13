@@ -131,6 +131,12 @@ If no keyring is available, set `"advanced": { "secretStore": "file" }`. Secrets
 
 See [docs/parser.md](docs/parser.md). In short, the script reads `msgin` (the payload as UTF-8 text) and sets `msgout` (text), `msgicon` (`ICON_NOTIFY`, `ICON_QUESTION`, `ICON_WARN`, `ICON_ERROR`, `ICON_OK` or `null`) and `msglink` (an http(s) URL or `null`). `return false` ignores the message; any other ending keeps it. `parseXml(text)` and `to_string(value)` are available.
 
+## Integrations
+
+Recipes for feeding the notifier from other systems. They need no plugin changes, only a publisher and a parser script:
+
+- [Klipper / 3D printers](docs/klipper.md): print started, finished, paused, resumed, cancelled and failed, from Moonraker's MQTT support. Clicking a notification opens the printer's Mainsail or Fluidd page.
+
 ## Widget settings
 
 These live in the widget's own entry in `~/.config/omarchy/shell.json` and are described by the manifest schema:
@@ -182,7 +188,7 @@ cd helper && deno task check    # type-check the helper
 scripts/install.sh --watch      # copy + restart the shell on every save
 ```
 
-Further docs: [dependencies](docs/dependencies.md), [troubleshooting](docs/troubleshooting.md), [helper IPC protocol](docs/ipc.md).
+Further docs: [dependencies](docs/dependencies.md), [Klipper recipe](docs/klipper.md), [troubleshooting](docs/troubleshooting.md), [helper IPC protocol](docs/ipc.md).
 
 ## Status
 
