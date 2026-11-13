@@ -3,7 +3,7 @@
 | Dependency | Package | Why | Present on a stock Omarchy 4.5? |
 |---|---|---|---|
 | Omarchy shell | `omarchy` 4.5 | Hosts the plugin (Quickshell 0.3, Qt 6.12) | yes |
-| Deno ≥ 2.4 | `deno` | Runs the helper (MQTT, storage) and the parser worker | not guaranteed; `scripts/install.sh` installs it |
+| Deno ≥ 2.4 | `deno` | Runs the helper (MQTT, storage) and the parser worker | not guaranteed: `sudo pacman -S deno` (`scripts/install.sh` offers it) |
 | mqtt.js 5.16.1 | npm, pinned in `helper/deno.json` + `deno.lock` | MQTT 3.1.1/5.0 client with TLS support | downloaded into Deno's cache by the install script |
 | bubblewrap | `bubblewrap` | Namespace sandbox around parser scripts | yes (system dependency) |
 | libsecret | `libsecret` (`secret-tool`) | Reads broker secrets from the keyring | yes |
@@ -18,4 +18,4 @@ QML in Quickshell has no TCP sockets, and none of Qt MQTT, mosquitto or paho-mqt
 
 ## Offline operation
 
-The helper runs with `--cached-only --frozen`, so it never downloads anything at runtime. If the Deno cache is cleared (`~/.cache/deno`), run `scripts/install.sh` again to repopulate it.
+The helper runs with `--cached-only --frozen`, so it never downloads code while running. Before starting it, `helper/start.sh` checks the cache offline and, only if something is missing (first start after `omarchy plugin add`, or a cleared `~/.cache/deno`), runs `deno install --frozen`, which fetches exactly the versions and checksums in `helper/deno.lock`.

@@ -15,9 +15,11 @@ Output from the plugin's own `console.log` doesn't appear in the shell log. Use 
 
 **The bell doesn't appear.** Check that the plugin is in the bar layout (`omarchy plugin list`, then `omarchy plugin enable odach.mqtt-notifier --section right`). Then run `omarchy plugin validate ~/.config/omarchy/plugins/odach.mqtt-notifier`.
 
-**The panel says "deno is not installed".** Run `sudo pacman -S deno`, then `omarchy restart shell`.
+**The panel says "Deno is not installed".** Run `sudo pacman -S deno`, then `omarchy restart shell`.
 
-**The helper keeps restarting.** Look at the end of `helper.log`. If `deno install` was never run, the helper can't find mqtt.js because it runs with `--cached-only`; run `scripts/install.sh`.
+**The panel says "Could not download the MQTT library".** The first start fetches the `mqtt` npm package. The helper retries on its own (up to once a minute) once the network is up. Details are in `~/.local/state/omarchy/mqtt-notifier/logs/dependencies.log`.
+
+**The helper keeps restarting.** Look at the end of `helper.log`. The helper runs with `--cached-only`; `start.sh` fetches missing dependencies before starting it, so a cleared `~/.cache/deno` is refilled on the next start.
 
 **A broker shows "bad username or password".** The password comes from the keyring, not `config.json`. Check it with `secret-tool lookup service omarchy-mqtt-notifier broker <id> field password`. A keyring that stays locked after login also causes this.
 
@@ -33,7 +35,7 @@ Output from the plugin's own `console.log` doesn't appear in the shell log. Use 
 
 **Parser changes don't apply.** The helper reloads `config.json` and `parsers/*.js` when they're saved. Check the log for `config:` problems; a file outside `parsers/` is refused.
 
-**Edits to the plugin code don't show up.** The shell caches compiled QML and JS and keeps the MQTT service loaded across plugin reloads. Run `scripts/install.sh` (it restarts the shell) or `omarchy restart shell`.
+**Edits to the plugin code don't show up.** The shell caches compiled QML and JS and keeps the MQTT service loaded across plugin reloads. Run `omarchy restart shell` (after `omarchy plugin update`), or `scripts/install.sh` from a clone (it restarts the shell).
 
 **"bubblewrap unavailable" in the log.** User namespaces are probably disabled. Parsers still run with Deno's permission sandbox; set `"advanced": {"sandbox": "deno"}` to silence the probe, or `"bwrap"` to refuse to run without it.
 
@@ -43,4 +45,4 @@ Output from the plugin's own `console.log` doesn't appear in the shell log. Use 
 
 - Clear the history: Clear All in the panel, or delete `~/.local/state/omarchy/mqtt-notifier/notifications.jsonl` and `state.json` while the shell is stopped.
 - Start the configuration over: delete `~/.config/omarchy/mqtt-notifier/config.json`. A disabled example is recreated on the next start.
-- Remove everything: `scripts/uninstall.sh --purge`.
+- Remove everything: `omarchy plugin remove odach.mqtt-notifier`, then delete `~/.config/omarchy/mqtt-notifier` and `~/.local/state/omarchy/mqtt-notifier` (or `scripts/uninstall.sh --purge` from a clone).

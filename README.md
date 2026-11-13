@@ -11,7 +11,24 @@ A bar widget for the Omarchy 4.5 shell that turns MQTT messages into notificatio
 
 ## Install
 
-Requires Omarchy 4.5 and `git`. Clone the repository anywhere and run the installer from it:
+Requires Omarchy 4.5 and Deno (not part of a default Omarchy install):
+
+```bash
+sudo pacman -S deno
+omarchy plugin add https://github.com/odaszek/omarchy-mqtt-notifier.git --enable
+```
+
+`omarchy plugin add` clones the repository into `~/.config/omarchy/plugins/odach.mqtt-notifier` and adds the bell to the bar. On its first start the plugin downloads its one npm dependency, `mqtt`, at the exact version and checksum pinned in `helper/deno.lock` (this needs the network once; the panel says so if it fails, and it retries).
+
+Then add a broker from the bell's gear button (Settings → Brokers).
+
+**Update:** `omarchy plugin update odach.mqtt-notifier`, then `omarchy restart shell`. The restart is needed because the shell caches compiled QML and keeps the MQTT service loaded across plugin reloads.
+
+**Uninstall:** `omarchy plugin remove odach.mqtt-notifier`. Your config (`~/.config/omarchy/mqtt-notifier`) and history (`~/.local/state/omarchy/mqtt-notifier`) are kept; delete those folders too to remove everything, and the keyring passwords with `secret-tool clear service omarchy-mqtt-notifier`.
+
+Optional: `bubblewrap` (namespace sandbox for parser scripts) and `libsecret` (`secret-tool`, keyring passwords) ship with Omarchy; see [dependencies](docs/dependencies.md).
+
+### From a clone (development)
 
 ```bash
 git clone https://github.com/odaszek/omarchy-mqtt-notifier.git
@@ -19,18 +36,7 @@ cd omarchy-mqtt-notifier
 scripts/install.sh
 ```
 
-To update later: `git pull && scripts/install.sh` in the same folder.
-
-The script:
-
-1. checks for `deno` (it offers `sudo pacman -S deno` if missing);
-2. caches the pinned npm dependency (`mqtt`);
-3. copies the plugin to `~/.config/omarchy/plugins/odach.mqtt-notifier` (Omarchy doesn't allow symlinked plugins);
-4. adds the bell to the right side of the bar.
-
-Running it again updates the plugin and restarts the shell (`omarchy restart shell`). The restart is needed because the shell caches compiled QML and keeps the MQTT service loaded across plugin reloads.
-
-Uninstall with `scripts/uninstall.sh`. Add `--purge` to also delete config, history, logs and keyring secrets.
+The script checks for `deno` (offering `sudo pacman -S deno`), caches the dependency, copies the plugin to `~/.config/omarchy/plugins/odach.mqtt-notifier` (Omarchy doesn't allow symlinked plugins), adds the bell to the bar, and restarts the shell when updating. `git pull && scripts/install.sh` updates; `scripts/uninstall.sh [--purge]` removes it. Use one method or the other: `omarchy plugin update` only updates a plugin installed with `omarchy plugin add`.
 
 ## Settings window
 
