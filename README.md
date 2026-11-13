@@ -1,5 +1,7 @@
 # MQTT Notifier for Omarchy
 
+<img src="preview.png" alt="The notification panel: a list of MQTT notifications with icons, times, topics and links" width="380" align="right">
+
 A bar widget for the Omarchy 4.5 shell that turns MQTT messages into notifications:
 
 - Connects to any number of brokers and topic subscriptions (MQTT 3.1.1 or 5.0, TCP or TLS).
