@@ -1,0 +1,16 @@
+{
+  "panel.title": "MQTT notifications",
+  "panel.unreadOfTotal": { "one": "%1 unread · %2 message", "other": "%1 unread · %2 messages" },
+  "panel.empty": "No notifications yet",
+  "panel.more": "More",
+  "panel.loading": "Loading…",
+  "panel.clearAll": "Clear all notifications",
+  "panel.settings": "Edit brokers and subscriptions",
+  "status.unreachable": "Broker %1 is unreachable",
+  "status.retry": "Reconnect now",
+  "item.openLink": "Open %1",
+  "confirm.clear": "Delete all stored MQTT notifications?",
+  "confirm.clearConfirm": "Clear all",
+  "tooltip.unread": { "one": "MQTT · %1 unread", "other": "MQTT · %1 unread" },
+  "tooltip.brokersDown": { "one": "MQTT · %1 broker unreachable", "other": "MQTT · %1 brokers unreachable" }
+}

@@ -1,0 +1,8 @@
+# Deno
+node_modules/
+.deno/
+# editors
+*.swp
+*~
+.vscode/
+.idea/

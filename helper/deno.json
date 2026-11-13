@@ -1,0 +1,18 @@
+{
+  "imports": {
+    "mqtt": "npm:mqtt@5.16.1"
+  },
+  "tasks": {
+    "check": "deno check main.ts",
+    "lint": "deno lint",
+    "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys ../tests/",
+    "fmt": "deno fmt . ../tests ../lib"
+  },
+  "lint": {
+    "exclude": ["worker/"]
+  },
+  "fmt": {
+    "lineWidth": 140,
+    "semiColons": false
+  }
+}

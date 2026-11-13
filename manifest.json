@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "odach.mqtt-notifier",
+  "name": "MQTT Notifier",
+  "version": "0.1.0",
+  "author": "odach",
+  "description": "Notifications from MQTT brokers: bar icon with unread count, history panel, desktop notifications, and sandboxed JavaScript parsers.",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "MQTT Notifier",
+    "description": "Notifications from MQTT brokers with history and unread count.",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "initialMessageCount": 10,
+      "loadMoreCount": 10,
+      "maxStoredMessages": 1000,
+      "popupWidth": 380,
+      "popupMaxHeight": 600,
+      "desktopNotifications": true,
+      "showUnreadCounter": true,
+      "markReadOnOpen": true
+    },
+    "schema": [
+      { "key": "initialMessageCount", "type": "integer", "label": "Messages shown when the panel opens", "min": 1, "max": 200, "step": 1, "defaultValue": 10 },
+      { "key": "loadMoreCount", "type": "integer", "label": "Messages added per \"More\" click", "min": 1, "max": 200, "step": 1, "defaultValue": 10 },
+      { "key": "maxStoredMessages", "type": "integer", "label": "Maximum stored messages", "min": 1, "max": 100000, "step": 100, "defaultValue": 1000 },
+      { "key": "popupWidth", "type": "integer", "label": "Panel width (px)", "min": 280, "max": 1200, "step": 10, "defaultValue": 380 },
+      { "key": "popupMaxHeight", "type": "integer", "label": "Panel maximum height (px)", "min": 200, "max": 2000, "step": 10, "defaultValue": 600 },
+      { "key": "desktopNotifications", "type": "boolean", "label": "Desktop notifications", "defaultValue": true },
+      { "key": "showUnreadCounter", "type": "boolean", "label": "Show unread counter", "defaultValue": true },
+      { "key": "markReadOnOpen", "type": "boolean", "label": "Mark messages read when the panel opens", "defaultValue": true }
+    ]
+  }
+}
