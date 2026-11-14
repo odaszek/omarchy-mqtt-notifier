@@ -107,24 +107,20 @@ export class Processor {
     if (!broker || matchingSubscriptions(broker, msg).length === 0) return Promise.resolve()
     const limit = this.opts.maxPayloadBytes()
     const size = msg.payload.byteLength
-    // Copy the payload so only its own bytes are kept, not the socket chunk it was parsed from.
-    const queued: QueuedMessage = size > limit
-      ? { ...msg, payload: new Uint8Array(0), oversize: size, limit }
-      : { ...msg, payload: msg.payload.slice(), oversize: null, limit }
-    const cost = queued.payload.byteLength
-    this.#pending++
-    this.#pendingBytes += cost
-    const run = () =>
-      this.#process(queued).catch((e) => {
-        this.opts.log.error(
-          "processing " + msg.brokerId + " " + msg.topic + " failed: " + (e instanceof Error ? e.stack ?? e.message : String(e)),
-        )
-      }).finally(() => {
-        this.#pending--
-        this.#pendingBytes -= cost
-        this.#release()
-      })
-    this.#queue = this.#queue.then(run, run)
+    // Build a fresh record and never use `msg` after this point: a closure
+    // that kept it would keep the original (possibly oversized) payload alive
+    // until the message is processed. The payload is copied so only its own
+    // bytes are kept, not the socket chunk it was parsed from.
+    const queued: QueuedMessage = {
+      brokerId: msg.brokerId,
+      topic: msg.topic,
+      retain: msg.retain,
+      filters: msg.filters,
+      payload: size > limit ? new Uint8Array(0) : msg.payload.slice(),
+      oversize: size > limit ? size : null,
+      limit,
+    }
+    this.#enqueue(queued)
     if (this.#pending < this.#maxMessages && this.#pendingBytes < this.#maxBytes) return Promise.resolve()
     if (this.#waiters.length === 0) {
       this.opts.log.warn(
@@ -132,6 +128,28 @@ export class Processor {
       )
     }
     return new Promise((resolve) => this.#waiters.push(resolve))
+  }
+
+  /** Bytes charged to the backlog: payloads kept plus topics (UTF-16). */
+  get pendingBytes(): number {
+    return this.#pendingBytes
+  }
+
+  #enqueue(queued: QueuedMessage): void {
+    const cost = queued.payload.byteLength + queued.topic.length * 2
+    this.#pending++
+    this.#pendingBytes += cost
+    const run = () =>
+      this.#process(queued).catch((e) => {
+        this.opts.log.error(
+          "processing " + queued.brokerId + " " + queued.topic + " failed: " + (e instanceof Error ? e.stack ?? e.message : String(e)),
+        )
+      }).finally(() => {
+        this.#pending--
+        this.#pendingBytes -= cost
+        this.#release()
+      })
+    this.#queue = this.#queue.then(run, run)
   }
 
   /** Resolves once everything queued so far has been processed. */

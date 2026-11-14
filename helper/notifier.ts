@@ -6,6 +6,11 @@
 // the plugin's panel. The link is also shown as the panel list does, a "<link glyph> Open <host>" line under
 // the text: an <a href> the Omarchy daemon renders and opens after its own URL
 // check. The body is escaped: the notification spec treats it as markup.
+//
+// Popups are rate limited (a burst of BURST, then one per REFILL_MS) and at
+// most MAX_RUNNING notify-send processes run at once, so a flood of MQTT
+// messages can neither spawn processes without bound nor bury the desktop.
+// Messages over the limit are still stored; one summary popup reports them.
 
 import type { Logger } from "./log.ts"
 import type { Notification } from "./store.ts"
@@ -65,47 +70,134 @@ export function notifyArgs(n: Notification, title: string, wait: boolean, linkLa
   return args
 }
 
+/** Popups allowed back to back, then one per REFILL_MS. */
+export const BURST = 5
+export const REFILL_MS = 2000
+/** notify-send processes running at once (waiting for a click or still starting). */
+const MAX_RUNNING = 32
+
+export function summaryArgs(count: number, label: string, wait: boolean): string[] {
+  const args = ["--app-name=MQTT Notifier", "--urgency=normal", "--icon=mail-unread-symbolic", "--category=im.received"]
+  if (wait) args.push("--action=default=Open", "--wait")
+  args.push("--", "MQTT Notifier", escapeMarkup(label.replace("%1", String(count))))
+  return args
+}
+
+export interface NotifierOptions {
+  burst?: number
+  refillMs?: number
+  /** Runs notify-send; resolves with its stdout, or null when it failed. Tests replace it. */
+  exec?: (args: string[], wait: boolean) => Promise<string | null>
+}
+
 export class DesktopNotifier {
-  enabled = true
+  #enabled = true
   #waiting = 0
+  #running = 0
+  #burst: number
+  #refillMs: number
+  #tokens: number
+  #refilledAt = Date.now()
+  #suppressed = 0
+  #summaryTimer: ReturnType<typeof setTimeout> | undefined
+  #exec: (args: string[], wait: boolean) => Promise<string | null>
 
   /** Label of the link line ("%1" = host); set from the panel's translations. */
   linkLabel = "Open %1"
+  /** Text of the popup that reports rate-limited messages ("%1" = how many). */
+  suppressedLabel = "%1 more messages arrived. Open the panel to see them."
 
   constructor(
     private log: Logger,
     private onActivate: (id: string) => void,
     private onOpenLink: (id: string, url: string) => void,
-  ) {}
+    options: NotifierOptions = {},
+  ) {
+    this.#burst = options.burst ?? BURST
+    this.#refillMs = options.refillMs ?? REFILL_MS
+    this.#tokens = this.#burst
+    this.#exec = options.exec ?? ((args, wait) => this.#notifySend(args, wait))
+  }
+
+  get enabled(): boolean {
+    return this.#enabled
+  }
+  set enabled(value: boolean) {
+    this.#enabled = value
+    if (!value) {
+      this.#suppressed = 0
+      clearTimeout(this.#summaryTimer)
+      this.#summaryTimer = undefined
+    }
+  }
 
   show(n: Notification, title: string): void {
-    if (!this.enabled) return
+    if (!this.#enabled) return
+    if (!this.#take()) {
+      this.#suppressed++
+      this.#scheduleSummary()
+      return
+    }
     const wait = this.#waiting < MAX_WAITING
-    let child: Deno.ChildProcess
+    this.#run(notifyArgs(n, title, wait, this.linkLabel), wait, () => {
+      if (n.link) this.onOpenLink(n.id, n.link)
+      else this.onActivate(n.id)
+    })
+  }
+
+  /** Take one popup from the allowance, if there is one. */
+  #take(): boolean {
+    const now = Date.now()
+    const earned = Math.floor((now - this.#refilledAt) / this.#refillMs)
+    if (earned > 0) {
+      this.#tokens = Math.min(this.#burst, this.#tokens + earned)
+      this.#refilledAt = this.#tokens === this.#burst ? now : this.#refilledAt + earned * this.#refillMs
+    }
+    if (this.#tokens < 1 || this.#running >= MAX_RUNNING) return false
+    this.#tokens--
+    return true
+  }
+
+  #scheduleSummary(): void {
+    if (this.#summaryTimer !== undefined) return
+    this.#summaryTimer = setTimeout(() => {
+      this.#summaryTimer = undefined
+      if (!this.#enabled || this.#suppressed === 0) return
+      if (!this.#take()) return this.#scheduleSummary()
+      const count = this.#suppressed
+      this.#suppressed = 0
+      const wait = this.#waiting < MAX_WAITING
+      this.#run(summaryArgs(count, this.suppressedLabel, wait), wait, () => this.onActivate(""))
+    }, this.#refillMs)
+  }
+
+  #run(args: string[], wait: boolean, onClick: () => void): void {
+    this.#running++
+    if (wait) this.#waiting++
+    this.#exec(args, wait).then((stdout) => {
+      if (wait && stdout !== null && stdout.trim() === "default") onClick()
+    }).finally(() => {
+      this.#running--
+      if (wait) this.#waiting--
+    })
+  }
+
+  async #notifySend(args: string[], wait: boolean): Promise<string | null> {
     try {
-      child = new Deno.Command("notify-send", {
-        args: notifyArgs(n, title, wait, this.linkLabel),
+      const out = await new Deno.Command("notify-send", {
+        args,
         stdout: wait ? "piped" : "null",
         stderr: "piped",
         stdin: "null",
-      }).spawn()
-    } catch (e) {
-      this.log.warn("notify-send failed: " + (e instanceof Error ? e.message : String(e)))
-      return
-    }
-    if (wait) this.#waiting++
-    child.output().then((out) => {
+      }).output()
       if (!out.success) {
         this.log.warn("notify-send exited with " + out.code + ": " + new TextDecoder().decode(out.stderr).trim().slice(0, 300))
-        return
+        return null
       }
-      if (!wait || new TextDecoder().decode(out.stdout).trim() !== "default") return
-      if (n.link) this.onOpenLink(n.id, n.link)
-      else this.onActivate(n.id)
-    }).catch((e) => {
+      return wait ? new TextDecoder().decode(out.stdout) : ""
+    } catch (e) {
       this.log.warn("notify-send failed: " + (e instanceof Error ? e.message : String(e)))
-    }).finally(() => {
-      if (wait) this.#waiting--
-    })
+      return null
+    }
   }
 }

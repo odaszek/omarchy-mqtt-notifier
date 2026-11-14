@@ -32,7 +32,9 @@ function nameAt(xml, at) {
 
 function addChild(target, name, value) {
   if (!Object.prototype.hasOwnProperty.call(target, name)) {
-    target[name] = value
+    // defineProperty, not assignment: an element named __proto__ must become
+    // a plain key, not replace the result object's prototype.
+    Object.defineProperty(target, name, { value, writable: true, enumerable: true, configurable: true })
   } else if (Array.isArray(target[name])) {
     target[name].push(value)
   } else {

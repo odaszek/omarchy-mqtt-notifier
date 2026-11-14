@@ -6,7 +6,7 @@ import { backoffDelay } from "../helper/mqtt_manager.ts"
 import { matchingSubscriptions, Processor } from "../helper/processor.ts"
 import type { NotificationStore } from "../helper/store.ts"
 import type { ParserRunner } from "../helper/parser.ts"
-import { linkLine, notifyArgs } from "../helper/notifier.ts"
+import { DesktopNotifier, linkLine, notifyArgs } from "../helper/notifier.ts"
 import { parseXml } from "../helper/worker/xml.js"
 
 Deno.test("topic filters: wildcards", () => {
@@ -255,6 +255,49 @@ Deno.test("xml parser", () => {
   )
 })
 
+Deno.test("xml parser: an element named __proto__ is a plain key", () => {
+  // deno-lint-ignore no-explicit-any
+  const d: any = parseXml("<r><__proto__><admin>yes</admin></__proto__></r>")
+  assertEquals(Object.getPrototypeOf(d.r), Object.prototype)
+  assertEquals(d.r.admin, undefined)
+  assertEquals(Object.keys(d.r), ["__proto__"])
+})
+
+Deno.test("desktop notifications: rate limited, with one summary for the rest", async () => {
+  const calls: string[][] = []
+  const notifier = new DesktopNotifier(
+    { debug() {}, info() {}, warn() {}, error() {} },
+    () => {},
+    () => {},
+    { burst: 3, refillMs: 40, exec: (args) => (calls.push(args), Promise.resolve("")) },
+  )
+  notifier.suppressedLabel = "%1 more"
+  const n = (i: number) => ({
+    seq: i,
+    id: "id-" + i,
+    timestamp: "2026-01-01T00:00:00.000Z",
+    brokerId: "b",
+    broker: "B",
+    subscriptionId: "s",
+    topic: "t",
+    text: "m" + i,
+    icon: null,
+    link: null,
+    read: false,
+  })
+  for (let i = 1; i <= 20; i++) notifier.show(n(i), "T")
+  assertEquals(calls.map((a) => a[a.length - 1]), ["m1", "m2", "m3"])
+  await new Promise((r) => setTimeout(r, 120))
+  assertEquals(calls.length, 4)
+  assertEquals(calls[3].slice(-2), ["MQTT Notifier", "17 more"])
+  // Disabling drops a pending summary.
+  for (let i = 21; i <= 30; i++) notifier.show(n(i), "T")
+  notifier.enabled = false
+  const before = calls.length
+  await new Promise((r) => setTimeout(r, 120))
+  assertEquals(calls.length, before)
+})
+
 Deno.test("processor: bounded backlog, early discard, oversized payloads not retained", async () => {
   const broker = normalizeConfig({
     brokers: [{ id: "b", host: "h", subscriptions: [{ id: "s", topic: "t/#" }] }],
@@ -309,4 +352,38 @@ Deno.test("processor: bounded backlog, early discard, oversized payloads not ret
   await processor.idle()
   assertEquals(seen, ["1", "2", "Payload too large (4096 bytes, limit 1024)", "4"])
   assertEquals(processor.pending, 0)
+})
+
+Deno.test("processor: a queued oversized message does not keep its payload alive", async () => {
+  // deno-lint-ignore no-explicit-any
+  const gc = (globalThis as any).gc as (() => void) | undefined
+  if (!gc) return // run with --v8-flags=--expose-gc (deno task test does)
+  const broker = normalizeConfig({
+    brokers: [{ id: "b", host: "h", subscriptions: [{ id: "s", topic: "t/#" }] }],
+  }).brokers[0]
+  const processor = new Processor({
+    store: { add: (n: unknown) => Promise.resolve(n) } as unknown as NotificationStore,
+    // The first message never finishes, so everything after it stays queued.
+    parser: { run: () => new Promise(() => {}) } as unknown as ParserRunner,
+    log: { debug() {}, info() {}, warn() {}, error() {} },
+    broker: () => broker,
+    script: () => "return msgin",
+    maxPayloadBytes: () => 1024,
+    onNotification: () => {},
+  })
+  const msg = (payload: Uint8Array) => ({ brokerId: "b", topic: "t/x", payload, retain: false, filters: null })
+  processor.handle(msg(new TextEncoder().encode("first")))
+  // Allocate in a separate function so no local slot of this test holds a payload.
+  const deliver = (): WeakRef<Uint8Array> => {
+    const payload = new Uint8Array(1024 * 1024)
+    processor.handle(msg(payload))
+    return new WeakRef(payload)
+  }
+  const refs = [deliver(), deliver(), deliver()]
+  assertEquals(processor.pending, 4)
+  // Oversized payloads are charged nothing but their topic.
+  assert(processor.pendingBytes < 1024)
+  await new Promise((r) => setTimeout(r, 0))
+  gc()
+  assertEquals(refs.filter((r) => r.deref() !== undefined).length, 0)
 })

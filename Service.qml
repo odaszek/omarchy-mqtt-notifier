@@ -134,6 +134,8 @@ Item {
   // Link line on desktop notifications, "Open %1" with the host (follows the language).
   readonly property string linkLabel: translations.t("item.openLink", "Open %1")
   onLinkLabelChanged: if (helperReady) request("settings", { settings: { linkLabel: linkLabel } })
+  readonly property string suppressedLabel: translations.t("notify.suppressed", "%1 more messages arrived. Open the panel to see them.")
+  onSuppressedLabelChanged: if (helperReady) request("settings", { settings: { suppressedLabel: suppressedLabel } })
   onDesktopNotificationsChanged: if (helperReady) request("settings", { settings: { desktopNotifications: desktopNotifications } })
 
   function handleLine(line) {
@@ -161,7 +163,7 @@ Item {
       helperError = ""
       lastWarning = ""
       request("settings", { settings: { maxStoredMessages: maxStored, desktopNotifications: desktopNotifications,
-        linkLabel: linkLabel } })
+        linkLabel: linkLabel, suppressedLabel: suppressedLabel } })
       loadFirstPage()
       break
     case "brokers":

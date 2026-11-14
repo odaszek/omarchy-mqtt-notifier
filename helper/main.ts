@@ -245,6 +245,10 @@ const handlers: Record<string, (req: Req) => Promise<unknown> | unknown> = {
       // deno-lint-ignore no-control-regex
       notifier.linkLabel = s.linkLabel.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 40)
     }
+    if (typeof s.suppressedLabel === "string" && s.suppressedLabel.includes("%1")) {
+      // deno-lint-ignore no-control-regex
+      notifier.suppressedLabel = s.suppressedLabel.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 200)
+    }
     emitCounts()
     return {
       retention: store.retention,

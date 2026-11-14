@@ -5,7 +5,7 @@
   "tasks": {
     "check": "deno check main.ts",
     "lint": "deno lint",
-    "test": "deno test --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys ../tests/",
+    "test": "deno test --v8-flags=--expose-gc --allow-read --allow-write --allow-net --allow-run --allow-env --allow-sys ../tests/",
     "fmt": "deno fmt --config deno.json . ../tests ../lib"
   },
   "lint": {

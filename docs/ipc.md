@@ -8,7 +8,7 @@
 
 | op | params | result |
 |---|---|---|
-| `settings` | `settings: {maxStoredMessages?, desktopNotifications?, linkLabel?}` (`linkLabel`: the desktop notification's link text, `%1` = host) | `{retention, desktopNotifications}`. A smaller retention is applied immediately. |
+| `settings` | `settings: {maxStoredMessages?, desktopNotifications?, linkLabel?, suppressedLabel?}` (`linkLabel`: the desktop notification's link text, `%1` = host; `suppressedLabel`: the summary popup shown after rate-limited popups, `%1` = count) | `{retention, desktopNotifications}`. A smaller retention is applied immediately. |
 | `page` | `limit`, `beforeSeq?` | `{items, hasMore, total, unread}`, newest first. `beforeSeq` is the `seq` of the last item already shown. |
 | `markAllRead` | – | `{readThroughSeq}` |
 | `clear` | – | `{total: 0}` |
@@ -35,7 +35,7 @@
 | `brokers` | `brokers: [{id, name, enabled, state, error, retryIn, subscriptions}]`. `state` is `disabled`, `connecting`, `connected`, `disconnected` or `error`. Bursts are coalesced (50 ms). |
 | `notification` | `notification: {seq, id, timestamp, brokerId, broker, subscriptionId, topic, text, icon, link, read}` |
 | `counts` | `total, unread` |
-| `activate` | `id`: a desktop notification without a link was clicked (open the panel) |
+| `activate` | `id`: a desktop notification without a link was clicked (open the panel); `""` for the rate-limit summary popup |
 | `openLink` | `id, url`: a desktop notification with a link was clicked. The panel re-checks the URL before opening it. |
 | `log` | `level` (`warn`/`error`), `message`. Broker connection messages are not sent here; the `brokers` event carries that state. |
 | `fatal` | `error`: the helper is about to exit (deno missing, another instance holds the lock) |

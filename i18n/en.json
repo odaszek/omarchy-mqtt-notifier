@@ -12,6 +12,7 @@
   "status.unreachable": "Broker %1 is unreachable",
   "status.retry": "Reconnect now",
   "item.openLink": "Open %1",
+  "notify.suppressed": "%1 more messages arrived. Open the panel to see them.",
   "confirm.clear": "Delete all stored MQTT notifications?",
   "confirm.clearConfirm": "Clear all",
   "tooltip.unread": {
