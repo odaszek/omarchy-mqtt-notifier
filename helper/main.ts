@@ -146,7 +146,7 @@ const manager = new MqttManager({
     return secrets
   },
   log,
-  onMessage: (msg) => processor.handle(msg),
+  onMessage: (msg): Promise<void> => processor.handle(msg),
   onStatus: scheduleStatus,
 })
 

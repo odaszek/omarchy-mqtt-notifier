@@ -34,7 +34,8 @@ export interface ManagerOptions {
   certsDir: string
   secrets: SecretStore
   log: Logger
-  onMessage: (msg: IncomingMessage) => void
+  /** The next message from this broker is read only after the returned promise settles (backpressure). */
+  onMessage: (msg: IncomingMessage) => Promise<void> | void
   onStatus: () => void
 }
 
@@ -153,6 +154,17 @@ class BrokerConnection {
     const client = mqtt.connect(url, options)
     this.#client = client
     let failure: string | null = null
+    // mqtt.js emits "message" and then calls handleMessage, and reads no
+    // further packets from this connection until its callback runs. Holding
+    // the callback until the processor accepts more turns a flood into TCP
+    // backpressure instead of an unbounded queue in this process.
+    let accepted: Promise<void> | void = undefined
+    client.handleMessage = (_packet, callback) => {
+      const wait = accepted
+      accepted = undefined
+      if (!wait) return callback()
+      wait.then(() => callback(), () => callback())
+    }
 
     client.on("connect", () => {
       if (client !== this.#client) return
@@ -169,7 +181,7 @@ class BrokerConnection {
     })
     client.on("message", (topic, payload, packet) => {
       if (client !== this.#client) return
-      this.opts.onMessage({
+      accepted = this.opts.onMessage({
         brokerId: this.config.id,
         topic,
         payload: new Uint8Array(payload.buffer, payload.byteOffset, payload.byteLength),

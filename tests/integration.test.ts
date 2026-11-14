@@ -593,6 +593,16 @@ Deno.test({
         },
       )
 
+      await t.step("a flood is held at the broker connection and delivered in order", async () => {
+        const before = helper.notifications().length
+        const count = 600
+        await Promise.all(Array.from({ length: count }, (_, i) => a.publish("fresh/flood", String(i))))
+        const got = (await helper.waitNotifications(before + count, 60000)).slice(before)
+        assertEquals(got.map((n) => n.text), Array.from({ length: count }, (_, i) => "fresh: " + i))
+        const log = await Deno.readTextFile(stateDir + "/logs/helper.log")
+        assertStringIncludes(log, "message backlog full")
+      })
+
       await t.step("helper files are private", async () => {
         const mode = (await Deno.stat(stateDir + "/state.json")).mode! & 0o777
         assertEquals(mode, 0o600)

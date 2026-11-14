@@ -3,7 +3,9 @@ import { isValidFilter, matchTopic } from "../helper/topic.ts"
 import { decodePayload, escapeMarkup, toString, validateLink, validateOutput } from "../helper/validate.ts"
 import { normalizeConfig, resolveInside } from "../helper/config.ts"
 import { backoffDelay } from "../helper/mqtt_manager.ts"
-import { matchingSubscriptions } from "../helper/processor.ts"
+import { matchingSubscriptions, Processor } from "../helper/processor.ts"
+import type { NotificationStore } from "../helper/store.ts"
+import type { ParserRunner } from "../helper/parser.ts"
 import { linkLine, notifyArgs } from "../helper/notifier.ts"
 import { parseXml } from "../helper/worker/xml.js"
 
@@ -251,4 +253,60 @@ Deno.test("xml parser", () => {
     () => parseXml("<a>".repeat(100) + "</a>".repeat(100)),
     SyntaxError,
   )
+})
+
+Deno.test("processor: bounded backlog, early discard, oversized payloads not retained", async () => {
+  const broker = normalizeConfig({
+    brokers: [{ id: "b", host: "h", subscriptions: [{ id: "s", topic: "t/#" }] }],
+  }).brokers[0]
+  const gates: (() => void)[] = []
+  const seen: string[] = []
+  const silent = { debug() {}, info() {}, warn() {}, error() {} }
+  const processor = new Processor({
+    store: {
+      add: (n: { text: string }) => {
+        seen.push(n.text)
+        return Promise.resolve(n)
+      },
+    } as unknown as NotificationStore,
+    // Every parser run blocks until the test releases it.
+    parser: {
+      run: (_script: string, msgin: string) => new Promise((resolve) => gates.push(() => resolve({ ok: true, msgout: msgin, logs: [] }))),
+    } as unknown as ParserRunner,
+    log: silent,
+    broker: (id) => id === "b" ? broker : null,
+    script: () => "return msgin",
+    maxPayloadBytes: () => 1024,
+    onNotification: () => {},
+    maxPendingMessages: 4,
+  })
+  const msg = (topic: string, payload: Uint8Array) => ({ brokerId: "b", topic, payload, retain: false, filters: null })
+  const text = (s: string) => new TextEncoder().encode(s)
+  const settled = (p: Promise<void>) => Promise.race([p.then(() => true), new Promise((r) => setTimeout(() => r(false), 10))])
+
+  // Unwanted messages never enter the queue.
+  assert(await settled(processor.handle(msg("other", text("x")))))
+  assert(await settled(processor.handle({ ...msg("t/x", text("x")), brokerId: "gone" })))
+  assertEquals(processor.pending, 0)
+
+  // Below the limit delivery continues at once; at the limit the caller is held.
+  assert(await settled(processor.handle(msg("t/1", text("1")))))
+  assert(await settled(processor.handle(msg("t/2", text("2")))))
+  assert(await settled(processor.handle(msg("t/3", new Uint8Array(4096)))))
+  const held = processor.handle(msg("t/4", text("4")))
+  assertEquals(processor.pending, 4)
+  assertFalse(await settled(held))
+
+  // Draining to half the limit releases the caller.
+  gates.shift()!()
+  await new Promise((r) => setTimeout(r, 0))
+  assertFalse(await settled(held))
+  gates.shift()!()
+  assert(await settled(held))
+  // The oversized payload needs no parser run; message 4 is next.
+  while (gates.length === 0) await new Promise((r) => setTimeout(r, 0))
+  gates.shift()!()
+  await processor.idle()
+  assertEquals(seen, ["1", "2", "Payload too large (4096 bytes, limit 1024)", "4"])
+  assertEquals(processor.pending, 0)
 })
